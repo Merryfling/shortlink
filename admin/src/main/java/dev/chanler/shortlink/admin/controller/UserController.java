@@ -1,7 +1,9 @@
 package dev.chanler.shortlink.admin.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.common.convention.result.Results;
+import dev.chanler.shortlink.admin.dto.resp.UserActualRespDTO;
 import dev.chanler.shortlink.admin.dto.resp.UserRespDTO;
 import dev.chanler.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -25,5 +27,13 @@ public class UserController {
     @GetMapping("/api/shortlink/v1/user/{username}")
     public Result<UserRespDTO> getUserByUsername(@PathVariable("username") String username) {
         return Results.success(userService.getByUsername(username));
+    }
+
+    /**
+     * 根据用户名查找用户无脱敏
+     */
+    @GetMapping("/api/shortlink/v1/actual/user/{username}")
+    public Result<UserActualRespDTO> getActualUserByUsername(@PathVariable("username") String username) {
+        return Results.success(BeanUtil.toBean(userService.getByUsername(username), UserActualRespDTO.class));
     }
 }
