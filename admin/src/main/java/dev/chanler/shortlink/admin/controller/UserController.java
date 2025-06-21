@@ -3,13 +3,12 @@ package dev.chanler.shortlink.admin.controller;
 import cn.hutool.core.bean.BeanUtil;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.common.convention.result.Results;
+import dev.chanler.shortlink.admin.dto.req.UserRegisterReqDTO;
 import dev.chanler.shortlink.admin.dto.resp.UserActualRespDTO;
 import dev.chanler.shortlink.admin.dto.resp.UserRespDTO;
 import dev.chanler.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 用户管理控制层
@@ -24,7 +23,7 @@ public class UserController {
     /**
      * 根据用户名查找用户
      */
-    @GetMapping("/api/shortlink/v1/user/{username}")
+    @GetMapping("/api/short-link/v1/user/{username}")
     public Result<UserRespDTO> getUserByUsername(@PathVariable("username") String username) {
         return Results.success(userService.getByUsername(username));
     }
@@ -32,8 +31,25 @@ public class UserController {
     /**
      * 根据用户名查找用户无脱敏
      */
-    @GetMapping("/api/shortlink/v1/actual/user/{username}")
+    @GetMapping("/api/short-link/v1/actual/user/{username}")
     public Result<UserActualRespDTO> getActualUserByUsername(@PathVariable("username") String username) {
         return Results.success(BeanUtil.toBean(userService.getByUsername(username), UserActualRespDTO.class));
+    }
+
+    /**
+     * 查看用户名是否存在
+     */
+    @GetMapping("/api/short-link/v1/user/exists")
+    public Result<Boolean> existsByUsername(@RequestParam("username") String username) {
+        return Results.success(userService.existsByUsername(username));
+    }
+
+    /**
+     * 用户注册
+     */
+    @PostMapping("/api/short-link/v1/user")
+    public Result<Void> register(@RequestBody UserRegisterReqDTO userRegisterReqDTO) {
+        userService.register(userRegisterReqDTO);
+        return Results.success();
     }
 }
