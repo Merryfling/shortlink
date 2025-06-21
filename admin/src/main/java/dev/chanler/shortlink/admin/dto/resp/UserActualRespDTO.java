@@ -1,7 +1,5 @@
 package dev.chanler.shortlink.admin.dto.resp;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import dev.chanler.shortlink.admin.common.serialize.PhoneDesensitizationSerializer;
 import lombok.Data;
 
 /**
@@ -10,7 +8,7 @@ import lombok.Data;
  * @date: 2025/5/11 - 20:03
  */
 @Data
-public class UserRespDTO {
+public class UserActualRespDTO {
     /**
      * ID
      */
@@ -29,7 +27,6 @@ public class UserRespDTO {
     /**
      * 手机号
      */
-    @JsonSerialize(using = PhoneDesensitizationSerializer.class)
     private String phone;
 
     /**

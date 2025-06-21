@@ -1,4 +1,4 @@
-package dev.chanler.shortlink.admin.common.convention.web;
+package dev.chanler.shortlink.admin.common.web;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
