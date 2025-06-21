@@ -1,10 +1,10 @@
 server:
-  port: 8002
+  port: 8000
 
 spring:
   datasource:
-    username: shortlink
-    password: TheBestWorkShortlink1!
+    username: linkapp
+    password: TheBestWorkLinkapp1!
     url: jdbc:mysql://127.0.0.1:3306/link?characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&serverTimezone=GMT%2B8
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
@@ -13,3 +13,8 @@ spring:
       idle-timeout: 300000
       maximum-pool-size: 5
       minimum-idle: 5
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: TheBestWorkLoanapp1
