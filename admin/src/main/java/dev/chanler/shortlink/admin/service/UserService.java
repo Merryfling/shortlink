@@ -2,7 +2,10 @@ package dev.chanler.shortlink.admin.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.chanler.shortlink.admin.dao.entity.UserDO;
+import dev.chanler.shortlink.admin.dto.req.UserLoginReqDTO;
 import dev.chanler.shortlink.admin.dto.req.UserRegisterReqDTO;
+import dev.chanler.shortlink.admin.dto.req.UserUpdateReqDTO;
+import dev.chanler.shortlink.admin.dto.resp.UserLoginRespDTO;
 import dev.chanler.shortlink.admin.dto.resp.UserRespDTO;
 
 /**
@@ -30,4 +33,25 @@ public interface UserService extends IService<UserDO> {
      * @return void
      */
     void register(UserRegisterReqDTO userRegisterReqDTO);
+
+    /**
+     * 修改用户信息
+     * @param userUpdateReqDTO
+     * @return void
+     */
+    void updateByUsername(UserUpdateReqDTO userUpdateReqDTO);
+
+    /**
+     * 用户登录
+     * @param userLoginReqDTO
+     * @return UserLoginRespDTO
+     */
+    UserLoginRespDTO login(UserLoginReqDTO userLoginReqDTO);
+
+    /**
+     * 检查用户是否登录
+     * @param token
+     * @return Boolean
+     */
+    Boolean checkLogin(String token);
 }
