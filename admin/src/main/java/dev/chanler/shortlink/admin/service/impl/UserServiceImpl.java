@@ -99,13 +99,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (userDO == null) {
             throw new ClientException("用户不存在或密码错误");
         }
+        Boolean hasLogin = stringRedisTemplate.hasKey(userLoginReqDTO.getUsername());
+        if (hasLogin != null && hasLogin) {
+            //TODO: 挤掉其他登录，并重新登录或者允许多登录
+            throw new ClientException("用户已登录");
+        }
+        /**
+         * Hash
+         * Key: login_{username}
+         * Value:
+         *   Key: token
+         *   Value: UserDO JSON
+         */
         String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForValue().set(uuid, JSON.toJSONString(userDO),30L, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForHash().put("login_" + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
+        stringRedisTemplate.expire("login_" + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
         return new UserLoginRespDTO(uuid);
     }
 
     @Override
-    public Boolean checkLogin(String token) {
-        return stringRedisTemplate.hasKey(token);
+    public Boolean checkLogin(String username, String token) {
+        return stringRedisTemplate.opsForHash().get("login_" + username, token) != null;
+    }
+
+    @Override
+    public void logout(String username, String token) {
+        if (checkLogin(username, token)) {
+            stringRedisTemplate.delete(username);
+            return;
+        }
+        throw new ClientException("用户未登录或登录已过期");
     }
 }
