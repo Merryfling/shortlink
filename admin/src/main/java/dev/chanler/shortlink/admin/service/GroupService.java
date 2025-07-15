@@ -9,4 +9,10 @@ import dev.chanler.shortlink.admin.dao.entity.GroupDO;
  * @date: 2025/7/15 - 18:52
  */
 public interface GroupService extends IService<GroupDO> {
+    /**
+     * 新增短链接分组
+     * @param groupName 短链接分组名
+     * @return void
+     */
+    void saveGroup(String groupName);
 }
