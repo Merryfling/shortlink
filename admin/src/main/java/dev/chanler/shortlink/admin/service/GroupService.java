@@ -2,6 +2,7 @@ package dev.chanler.shortlink.admin.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.chanler.shortlink.admin.dao.entity.GroupDO;
+import dev.chanler.shortlink.admin.dto.req.GroupUpdateReqDTO;
 import dev.chanler.shortlink.admin.dto.resp.GroupRespDTO;
 
 import java.util.List;
@@ -23,4 +24,10 @@ public interface GroupService extends IService<GroupDO> {
      * @return List<GroupRespDTO>
      */
     List<GroupRespDTO> listGroup();
+
+    /**
+     * 修改短链接分组
+     * @param groupUpdateReqDTO 短链接分组参数
+     */
+    void updateGroup(GroupUpdateReqDTO groupUpdateReqDTO);
 }

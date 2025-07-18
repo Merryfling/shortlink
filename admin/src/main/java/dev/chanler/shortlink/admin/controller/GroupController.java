@@ -3,13 +3,11 @@ package dev.chanler.shortlink.admin.controller;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.common.convention.result.Results;
 import dev.chanler.shortlink.admin.dto.req.GroupSaveReqDTO;
+import dev.chanler.shortlink.admin.dto.req.GroupUpdateReqDTO;
 import dev.chanler.shortlink.admin.dto.resp.GroupRespDTO;
 import dev.chanler.shortlink.admin.service.GroupService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -24,7 +22,7 @@ public class GroupController {
     private final GroupService groupService;
 
     /**
-     *
+     * 创建短链接分组分组
      * @param groupSaveReqDTO
      * @return
      */
@@ -34,8 +32,23 @@ public class GroupController {
         return Results.success();
     }
 
+    /**
+     * 查询短链接分组列表
+     * @return
+     */
     @GetMapping("api/short-link/v1/group")
     public Result<List<GroupRespDTO>> listGroup() {
         return Results.success(groupService.listGroup());
+    }
+
+    /**
+     * 修改短链接分组名称
+     * @param groupUpdateReqDTO
+     * @return
+     */
+    @PutMapping("api/short-link/v1/group")
+    public Result<Void> listGroup(@RequestBody GroupUpdateReqDTO groupUpdateReqDTO) {
+        groupService.updateGroup(groupUpdateReqDTO);
+        return Results.success();
     }
 }
