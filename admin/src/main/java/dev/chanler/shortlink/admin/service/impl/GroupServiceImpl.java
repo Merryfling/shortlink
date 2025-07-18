@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import dev.chanler.shortlink.admin.common.biz.user.UserContext;
 import dev.chanler.shortlink.admin.dao.entity.GroupDO;
 import dev.chanler.shortlink.admin.dao.mapper.GroupMapper;
 import dev.chanler.shortlink.admin.dto.resp.GroupRespDTO;
@@ -34,6 +35,8 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         }
         GroupDO groupDO = GroupDO.builder()
                 .gid(gid)
+                .sortOrder(0)
+                .username(UserContext.getUsername())
                 .name(groupName)
                 .build();
         baseMapper.insert(groupDO);
@@ -42,8 +45,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     private boolean hasGid(String gid) {
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getGid, gid)
-                // TODO: 设置用户名
-                .eq(GroupDO::getUsername, null);
+                .eq(GroupDO::getUsername, UserContext.getUsername());
         GroupDO hasGroupFlag = baseMapper.selectOne(queryWrapper);
         return hasGroupFlag != null;
     }
@@ -52,8 +54,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     public List<GroupRespDTO> listGroup() {
         Wrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getDelFlag, 0)
-                // TODO: 获取用户名
-                .eq(GroupDO::getUsername, null)
+                .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
         return BeanUtil.copyToList(groupDOList, GroupRespDTO.class);
