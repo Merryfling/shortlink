@@ -5,14 +5,14 @@ import dev.chanler.shortlink.project.common.convention.result.Result;
 import dev.chanler.shortlink.project.common.convention.result.Results;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
+import dev.chanler.shortlink.project.dto.resp.GroupLinkCountQueryRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.LinkService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 短链接控制层
@@ -42,5 +42,15 @@ public class LinkController {
     @GetMapping("/api/short-link/v1/page")
     public Result<IPage<LinkPageRespDTO>> pageLink(LinkPageReqDTO linkPageReqDTO) {
         return Results.success(linkService.pageLink(linkPageReqDTO));
+    }
+
+    /**
+     * 查询分组内短链接数量
+     * @return Result<List<GroupLinkCountQueryRespDTO>>
+     */
+    @GetMapping("/api/short-link/v1/count")
+    public Result<List<GroupLinkCountQueryRespDTO>> listGroupLinkCount(@RequestParam("requestParam") List<String> gidList) {
+        return Results.success(linkService.listGroupLinkCount(gidList));
+
     }
 }

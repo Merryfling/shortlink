@@ -7,17 +7,22 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.admin.common.biz.user.UserContext;
+import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.dao.entity.GroupDO;
 import dev.chanler.shortlink.admin.dao.mapper.GroupMapper;
 import dev.chanler.shortlink.admin.dto.req.GroupSortReqDTO;
 import dev.chanler.shortlink.admin.dto.req.GroupUpdateReqDTO;
 import dev.chanler.shortlink.admin.dto.resp.GroupRespDTO;
+import dev.chanler.shortlink.admin.remote.dto.ShortLinkRemoteService;
+import dev.chanler.shortlink.admin.remote.dto.resp.GroupLinkCountQueryRespDTO;
 import dev.chanler.shortlink.admin.service.GroupService;
 import dev.chanler.shortlink.admin.util.RandomGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 短链接分组接口实现层
@@ -26,6 +31,9 @@ import java.util.List;
 @Slf4j
 @Service
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
+
+    ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
+    };
 
     @Override
     public void saveGroup(String groupName) {
@@ -96,6 +104,15 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder, GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        return BeanUtil.copyToList(groupDOList, GroupRespDTO.class);
+        Result<List<GroupLinkCountQueryRespDTO>> listResult = shortLinkRemoteService
+                .listGroupLinkCount(groupDOList.stream().map(GroupDO::getGid).toList());
+        List<GroupRespDTO> groupRespDTOList = BeanUtil.copyToList(groupDOList, GroupRespDTO.class);
+        groupRespDTOList.forEach(each -> {
+            Optional<GroupLinkCountQueryRespDTO> first = listResult.getData().stream()
+                    .filter(item -> Objects.equals(item.getGid(), each.getGid()))
+                    .findFirst();
+            first.ifPresent(item -> {each.setLinkCount(first.get().getLinkCount());});
+        });
+        return groupRespDTOList;
     }
 }
