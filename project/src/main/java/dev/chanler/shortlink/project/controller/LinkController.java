@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class LinkController {
 
     private final LinkService linkService;
+
     /**
      * 创建短链接
      *
