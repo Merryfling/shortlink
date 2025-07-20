@@ -27,7 +27,6 @@ public class LinkController {
 
     /**
      * 创建短链接
-     *
      * @return Result
      */
     @PostMapping("/api/short-link/v1/create")
@@ -35,7 +34,12 @@ public class LinkController {
         return Results.success(linkService.createLink(linkCreateReqDTO));
     }
 
-    @PutMapping("/api/short-link/v1/update")
+    /**
+     * 修改短链接
+     * @param linkUpdateReqDTO 短链接更新请求参数
+     * @return Result<Void>
+     */
+    @PostMapping("/api/short-link/v1/update")
     public Result<Void> updateLink(@RequestBody LinkUpdateReqDTO linkUpdateReqDTO) {
         linkService.updateLink(linkUpdateReqDTO);
         return Results.success();
