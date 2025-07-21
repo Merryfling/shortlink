@@ -40,11 +40,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.*;
 
@@ -80,6 +87,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .shortUri(shortLinkSuffix)
                 .enableStatus(0)
                 .fullShortUrl(fullShortUrl)
+                .favicon(getFavicon(linkCreateReqDTO.getOriginUrl()))
                 .build();
         LinkGotoDO linkGotoDO = LinkGotoDO.builder()
                 .fullShortUrl(fullShortUrl)
@@ -295,7 +303,88 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             customGenerateCount++;
         }
         return shortUri;
+    }
 
+    private String getFavicon(String url) {
+        if (StrUtil.isBlank(url)) {
+            return null;
+        }
+        try {
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                url = "http://" + url;
+            }
+            URL u = new URL(url);
+            String protocol = u.getProtocol();
+            String host = u.getHost();
+            int port = u.getPort();
+            StringBuilder base = new StringBuilder()
+                    .append(protocol).append("://").append(host);
+            if (port > 0 && port != u.getDefaultPort()) {
+                base.append(":").append(port);
+            }
+            String baseUrl = base.toString();
 
+            // 抓取页面 HTML（限 32KB）
+            String html = null;
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(2000);
+                conn.setReadTimeout(2000);
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+                int code = conn.getResponseCode();
+                if (code >= 200 && code < 300) {
+                    StringBuilder sb = new StringBuilder();
+                    try (InputStream in = conn.getInputStream();
+                         InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+                        char[] buf = new char[4096];
+                        int len;
+                        int total = 0;
+                        while ((len = reader.read(buf)) != -1 && total < 32768) {
+                            sb.append(buf, 0, len);
+                            total += len;
+                        }
+                    }
+                    html = sb.toString();
+                }
+            } catch (Exception ignore) {
+            }
+
+            // 解析 <link rel="icon"...>
+            if (StrUtil.isNotBlank(html)) {
+                Pattern p = Pattern.compile("(?i)<link[^>]+rel=[\"'](?:shortcut\\s+)?icon[\"'][^>]*href=[\"']([^\"']+)[\"']");
+                Matcher m = p.matcher(html);
+                if (m.find()) {
+                    String iconHref = m.group(1).trim();
+                    if (iconHref.startsWith("http://") || iconHref.startsWith("https://")) {
+                        return iconHref;
+                    } else if (iconHref.startsWith("//")) {
+                        return protocol + ":" + iconHref;
+                    } else if (iconHref.startsWith("/")) {
+                        return baseUrl + iconHref;
+                    } else {
+                        return baseUrl + "/" + iconHref;
+                    }
+                }
+            }
+
+            // 回退尝试 /favicon.ico
+            String fallback = baseUrl + "/favicon.ico";
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(fallback).openConnection();
+                c.setRequestMethod("GET"); // 有些站点不支持 HEAD
+                c.setConnectTimeout(1500);
+                c.setReadTimeout(1500);
+                c.setRequestProperty("User-Agent", "Mozilla/5.0");
+                int code = c.getResponseCode();
+                String ct = c.getContentType();
+                if (code >= 200 && code < 300 && ct != null && ct.toLowerCase().startsWith("image")) {
+                    return fallback;
+                }
+            } catch (Exception ignore) {
+            }
+        } catch (Exception e) {
+        }
+        return null;
     }
 }
