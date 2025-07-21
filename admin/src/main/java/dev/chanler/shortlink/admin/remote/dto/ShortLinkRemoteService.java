@@ -68,4 +68,15 @@ public interface ShortLinkRemoteService {
         return JSON.parseObject(resultPageStr, new TypeReference<>() {
         });
     }
+
+    /**
+     * 根据 URL 获取标题
+     * @param url URL
+     * @return Result<String>
+     */
+    default Result<String> getTitleByUrl(String url) {
+        String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/title?url=" + url);
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
 }
