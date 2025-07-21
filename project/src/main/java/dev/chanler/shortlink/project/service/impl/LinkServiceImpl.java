@@ -40,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -216,7 +217,10 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .eq(LinkGotoDO::getFullShortUrl, fullShortUrl);
             LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
             if (linkGotoDO == null) {
-                stringRedisTemplate.opsForValue().set(String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl), "-", 30, TimeUnit.MINUTES);
+                stringRedisTemplate.opsForValue().set(
+                        String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
+                        "-", 30, TimeUnit.MINUTES
+                );
                 return;
             }
             LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
@@ -226,7 +230,19 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .eq(LinkDO::getEnableStatus, 0);
             LinkDO linkDO = baseMapper.selectOne(queryWrapper);
             if (linkDO != null) {
-                stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl), linkDO.getOriginUrl());
+                if (linkDO.getValidDate() != null && linkDO.getValidDate().before(new Date())) {
+                    stringRedisTemplate.opsForValue().set(
+                            String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
+                            "-", 30, TimeUnit.MINUTES
+                    );
+                    return;
+                }
+                stringRedisTemplate.opsForValue().set(
+                        String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
+                        linkDO.getOriginUrl(),
+                        LinkUtil.getLinkCacheValidTime(linkDO.getValidDate()),
+                        TimeUnit.MILLISECONDS
+                );
                 try {
                     ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
                 } catch (IOException e) {
