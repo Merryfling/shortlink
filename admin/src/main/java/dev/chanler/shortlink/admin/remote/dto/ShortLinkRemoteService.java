@@ -91,4 +91,19 @@ public interface ShortLinkRemoteService {
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
+
+    /**
+     * 回收站分页查询
+     * @param linkPageReqDTO 分页请求参数
+     * @return Result<IPage<LinkPageRespDTO>>
+     */
+    default Result<IPage<LinkPageRespDTO>> pageRecycleBinLink(LinkPageReqDTO linkPageReqDTO) {
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("gid", linkPageReqDTO.getGid());
+        requestMap.put("current", linkPageReqDTO.getCurrent());
+        requestMap.put("size", linkPageReqDTO.getSize());
+        String resultPageStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/recycle-bin/page", requestMap);
+        return JSON.parseObject(resultPageStr, new TypeReference<>() {
+        });
+    }
 }
