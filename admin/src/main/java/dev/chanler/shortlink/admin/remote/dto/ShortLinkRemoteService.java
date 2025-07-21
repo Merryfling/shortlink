@@ -8,6 +8,7 @@ import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.remote.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.LinkUpdateReqDTO;
+import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.GroupLinkCountQueryRespDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkPageRespDTO;
@@ -76,6 +77,17 @@ public interface ShortLinkRemoteService {
      */
     default Result<String> getTitleByUrl(String url) {
         String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/title?url=" + url);
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 保存回收站数据
+     * @param recycleBinSaveReqDTO 回收站保存请求参数
+     * @return Result<Void>
+     */
+    default Result<Void> saveRecycledBin(RecycleBinSaveReqDTO recycleBinSaveReqDTO) {
+        String resultStr = HttpUtil.post("http://localhost:8001/api/short-link/v1/recycle-bin/save", JSON.toJSONString(recycleBinSaveReqDTO));
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
