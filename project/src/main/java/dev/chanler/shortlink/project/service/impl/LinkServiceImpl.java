@@ -195,10 +195,20 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
         }
         boolean contains = shortUriCreateCachePenetrationBloomFilter.contains(fullShortUrl);
         if (!contains) {
+            try {
+                ((HttpServletResponse) response).sendRedirect("/page/notfound");
+            } catch (IOException e) {
+                throw new ServiceException("重定向失败");
+            }
             return;
         }
         String gotoIsNullShortUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl));
         if (StrUtil.isNotBlank(gotoIsNullShortUrl)) {
+            try {
+                ((HttpServletResponse) response).sendRedirect("/page/notfound");
+            } catch (IOException e) {
+                throw new ServiceException("重定向失败");
+            }
             return;
         }
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
@@ -221,6 +231,11 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                         String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
                         "-", 30, TimeUnit.MINUTES
                 );
+                try {
+                    ((HttpServletResponse) response).sendRedirect("/page/notfound");
+                } catch (IOException e) {
+                    throw new ServiceException("重定向失败");
+                }
                 return;
             }
             LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
@@ -235,6 +250,11 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                             String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
                             "-", 30, TimeUnit.MINUTES
                     );
+                    try {
+                        ((HttpServletResponse) response).sendRedirect("/page/notfound");
+                    } catch (IOException e) {
+                        throw new ServiceException("重定向失败");
+                    }
                     return;
                 }
                 stringRedisTemplate.opsForValue().set(
