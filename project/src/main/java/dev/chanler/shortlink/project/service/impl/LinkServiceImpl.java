@@ -252,30 +252,28 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .eq(LinkDO::getDelFlag, 0)
                     .eq(LinkDO::getEnableStatus, 0);
             LinkDO linkDO = baseMapper.selectOne(queryWrapper);
-            if (linkDO != null) {
-                if (linkDO.getValidDate() != null && linkDO.getValidDate().before(new Date())) {
-                    stringRedisTemplate.opsForValue().set(
-                            String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
-                            "-", 30, TimeUnit.MINUTES
-                    );
-                    try {
-                        ((HttpServletResponse) response).sendRedirect("/page/notfound");
-                    } catch (IOException e) {
-                        throw new ServiceException("重定向失败");
-                    }
-                    return;
-                }
+            if (linkDO == null || (linkDO.getValidDate() != null && linkDO.getValidDate().before(new Date()))) {
                 stringRedisTemplate.opsForValue().set(
-                        String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
-                        linkDO.getOriginUrl(),
-                        LinkUtil.getLinkCacheValidTime(linkDO.getValidDate()),
-                        TimeUnit.MILLISECONDS
+                        String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
+                        "-", 30, TimeUnit.MINUTES
                 );
                 try {
-                    ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
+                    ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 } catch (IOException e) {
                     throw new ServiceException("重定向失败");
                 }
+                return;
+            }
+            stringRedisTemplate.opsForValue().set(
+                    String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
+                    linkDO.getOriginUrl(),
+                    LinkUtil.getLinkCacheValidTime(linkDO.getValidDate()),
+                    TimeUnit.MILLISECONDS
+            );
+            try {
+                ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
+            } catch (IOException e) {
+                throw new ServiceException("重定向失败");
             }
         } finally {
             lock.unlock();
