@@ -2,6 +2,7 @@ package dev.chanler.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -30,7 +31,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +42,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
+import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.LOCK_GOTO_SHORT_LINK_KEY;
 
 /**
  * 短链接接口实现层
@@ -49,8 +56,9 @@ import java.util.Objects;
 public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements LinkService {
 
     private final RBloomFilter<String> shortUriCreateCachePenetrationBloomFilter;
-    private final LinkMapper linkMapper;
     private final LinkGotoMapper linkGotoMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final RedissonClient redissonClient;
 
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
@@ -168,26 +176,50 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     public void restoreUrl(String shortUri, ServletRequest request, ServletResponse response) {
         String serverName = request.getServerName();
         String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
-        LambdaQueryWrapper<LinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(LinkGotoDO.class)
-                .eq(LinkGotoDO::getFullShortUrl, fullShortUrl);
-        LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
-        if (linkGotoDO == null) {
-            // TODO: 风控
-            return;
-        }
-        LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
-                .eq(LinkDO::getFullShortUrl, linkGotoDO.getFullShortUrl())
-                .eq(LinkDO::getGid, linkGotoDO.getGid())
-                .eq(LinkDO::getDelFlag, 0)
-                .eq(LinkDO::getEnableStatus, 0);
-        LinkDO linkDO = baseMapper.selectOne(queryWrapper);
-        if (linkDO != null) {
+        String originUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_SHORT_LINK_KEY), fullShortUrl));
+        if (StrUtil.isNotBlank(originUrl)) {
             try {
-                ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
+                ((HttpServletResponse) response).sendRedirect(originUrl);
             } catch (IOException e) {
-                log.error("重定向失败", e);
                 throw new ServiceException("重定向失败");
             }
+            return;
+        }
+        RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
+        lock.lock();
+        try {
+            originUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_SHORT_LINK_KEY), fullShortUrl));
+            if (StrUtil.isNotBlank(originUrl)) {
+                try {
+                    ((HttpServletResponse) response).sendRedirect(originUrl);
+                } catch (IOException e) {
+                    throw new ServiceException("重定向失败");
+                }
+                return;
+            }
+            LambdaQueryWrapper<LinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(LinkGotoDO.class)
+                    .eq(LinkGotoDO::getFullShortUrl, fullShortUrl);
+            LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
+            if (linkGotoDO == null) {
+                // TODO: 风控
+                return;
+            }
+            LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
+                    .eq(LinkDO::getFullShortUrl, linkGotoDO.getFullShortUrl())
+                    .eq(LinkDO::getGid, linkGotoDO.getGid())
+                    .eq(LinkDO::getDelFlag, 0)
+                    .eq(LinkDO::getEnableStatus, 0);
+            LinkDO linkDO = baseMapper.selectOne(queryWrapper);
+            if (linkDO != null) {
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl), linkDO.getOriginUrl());
+                try {
+                    ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
+                } catch (IOException e) {
+                    throw new ServiceException("重定向失败");
+                }
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
