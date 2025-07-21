@@ -146,7 +146,11 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .eq(LinkDO::getEnableStatus, 0)
                 .orderByDesc(LinkDO::getCreateTime);
         IPage<LinkDO> resultPage = baseMapper.selectPage(linkPageReqDTO, queryWrapper);
-        return resultPage.convert(each -> BeanUtil.toBean(each, LinkPageRespDTO.class));
+        return resultPage.convert(each -> {
+            LinkPageRespDTO bean = BeanUtil.toBean(each, LinkPageRespDTO.class);
+            bean.setDomain("http://" + bean.getDomain());
+            return bean;
+        });
     }
 
     @Override
