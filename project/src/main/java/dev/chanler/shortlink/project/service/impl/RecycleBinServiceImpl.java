@@ -1,11 +1,16 @@
 package dev.chanler.shortlink.project.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
+import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinSaveReqDTO;
+import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -37,5 +42,20 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
         stringRedisTemplate.delete(
                 String.format(GOTO_SHORT_LINK_KEY, recycleBinSaveReqDTO.getFullShortUrl())
         );
+    }
+
+    @Override
+    public IPage<LinkPageRespDTO> pageLink(LinkPageReqDTO linkPageReqDTO) {
+        LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
+                .eq(LinkDO::getDelFlag, 0)
+                .eq(LinkDO::getGid, linkPageReqDTO.getGid())
+                .eq(LinkDO::getEnableStatus, 1)
+                .orderByDesc(LinkDO::getCreateTime);
+        IPage<LinkDO> resultPage = baseMapper.selectPage(linkPageReqDTO, queryWrapper);
+        return resultPage.convert(each -> {
+            LinkPageRespDTO bean = BeanUtil.toBean(each, LinkPageRespDTO.class);
+            bean.setDomain("http://" + bean.getDomain());
+            return bean;
+        });
     }
 }
