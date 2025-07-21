@@ -13,6 +13,8 @@ import dev.chanler.shortlink.project.common.convention.exception.ClientException
 import dev.chanler.shortlink.project.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.project.common.enums.ValidDateTypeEnum;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
+import dev.chanler.shortlink.project.dao.entity.LinkGotoDO;
+import dev.chanler.shortlink.project.dao.mapper.LinkGotoMapper;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
@@ -22,6 +24,9 @@ import dev.chanler.shortlink.project.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.LinkService;
 import dev.chanler.shortlink.project.toolkit.HashUtil;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
@@ -29,6 +34,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +50,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
 
     private final RBloomFilter<String> shortUriCreateCachePenetrationBloomFilter;
     private final LinkMapper linkMapper;
+    private final LinkGotoMapper linkGotoMapper;
 
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
@@ -64,8 +71,13 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .enableStatus(0)
                 .fullShortUrl(fullShortUrl)
                 .build();
+        LinkGotoDO linkGotoDO = LinkGotoDO.builder()
+                .fullShortUrl(fullShortUrl)
+                .gid(linkCreateReqDTO.getGid())
+                .build();
         try {
             baseMapper.insert(linkDO);
+            linkGotoMapper.insert(linkGotoDO);
         } catch (DuplicateKeyException ex) {
             LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
                     .eq(LinkDO::getFullShortUrl, fullShortUrl);
@@ -77,7 +89,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
         }
         shortUriCreateCachePenetrationBloomFilter.add(fullShortUrl);
         return LinkCreateRespDTO.builder()
-                .fullShortUrl(linkDO.getFullShortUrl())
+                .fullShortUrl("http://" + linkDO.getFullShortUrl())
                 .originUrl(linkDO.getOriginUrl())
                 .gid(linkDO.getGid())
                 .build();
@@ -146,6 +158,33 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .groupBy("gid");
         List<Map<String, Object>> LinkDOList = baseMapper.selectMaps(queryWrapper);
         return BeanUtil.copyToList(LinkDOList, GroupLinkCountQueryRespDTO.class);
+    }
+
+    @Override
+    public void restoreUrl(String shortUri, ServletRequest request, ServletResponse response) {
+        String serverName = request.getServerName();
+        String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
+        LambdaQueryWrapper<LinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(LinkGotoDO.class)
+                .eq(LinkGotoDO::getFullShortUrl, fullShortUrl);
+        LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
+        if (linkGotoDO == null) {
+            // TODO: 风控
+            return;
+        }
+        LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
+                .eq(LinkDO::getFullShortUrl, linkGotoDO.getFullShortUrl())
+                .eq(LinkDO::getGid, linkGotoDO.getGid())
+                .eq(LinkDO::getDelFlag, 0)
+                .eq(LinkDO::getEnableStatus, 0);
+        LinkDO linkDO = baseMapper.selectOne(queryWrapper);
+        if (linkDO != null) {
+            try {
+                ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
+            } catch (IOException e) {
+                log.error("重定向失败", e);
+                throw new ServiceException("重定向失败");
+            }
+        }
     }
 
     private String generateSuffix(LinkCreateReqDTO linkCreateReqDTO) {

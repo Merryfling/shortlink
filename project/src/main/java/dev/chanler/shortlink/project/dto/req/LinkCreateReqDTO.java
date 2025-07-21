@@ -12,6 +12,7 @@ import java.util.Date;
  */
 @Data
 public class LinkCreateReqDTO {
+
     /**
      * 域名
      */

@@ -10,6 +10,8 @@ import dev.chanler.shortlink.project.dto.resp.GroupLinkCountQueryRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.LinkService;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,12 @@ import java.util.List;
 public class LinkController {
 
     private final LinkService linkService;
+
+    @GetMapping("/{shortUri}")
+    public void restoreUrl(@PathVariable String shortUri, ServletRequest request, ServletResponse response) {
+        linkService.restoreUrl(shortUri, request, response);
+
+    }
 
     /**
      * 创建短链接

@@ -9,6 +9,8 @@ import dev.chanler.shortlink.project.dto.req.LinkUpdateReqDTO;
 import dev.chanler.shortlink.project.dto.resp.GroupLinkCountQueryRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 
 import java.util.List;
 
@@ -44,4 +46,12 @@ public interface LinkService extends IService<LinkDO> {
      * @return List<GroupLinkCountQueryRespDTO>
      */
     List<GroupLinkCountQueryRespDTO> listGroupLinkCount(List<String> gidList);
+
+    /**
+     * 根据短链接还原原始链接
+     * @param shortUri 短链接后缀
+     * @param request HttpServerRequest
+     * @param response HttpServerResponse
+     */
+    void restoreUrl(String shortUri, ServletRequest request, ServletResponse response);
 }
