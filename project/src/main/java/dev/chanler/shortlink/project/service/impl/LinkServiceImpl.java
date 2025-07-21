@@ -42,9 +42,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
-import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
-import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.LOCK_GOTO_SHORT_LINK_KEY;
+import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.*;
 
 /**
  * 短链接接口实现层
@@ -185,6 +185,14 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             }
             return;
         }
+        boolean contains = shortUriCreateCachePenetrationBloomFilter.contains(fullShortUrl);
+        if (!contains) {
+            return;
+        }
+        String gotoIsNullShortUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl));
+        if (StrUtil.isNotBlank(gotoIsNullShortUrl)) {
+            return;
+        }
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
@@ -201,7 +209,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .eq(LinkGotoDO::getFullShortUrl, fullShortUrl);
             LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
             if (linkGotoDO == null) {
-                // TODO: 风控
+                stringRedisTemplate.opsForValue().set(String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl), "-", 30, TimeUnit.MINUTES);
                 return;
             }
             LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
