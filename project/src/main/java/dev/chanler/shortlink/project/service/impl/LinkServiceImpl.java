@@ -53,6 +53,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,6 +77,9 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final IpGeoClient ipGeoClient;
     private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
+    private final LinkAccessLogsMapper linkAccessLogsMapper;
+    private final LinkDeviceStatsMapper linkDeviceStatsMapper;
+    private final LinkNetworkStatsMapper linkNetworkStatsMapper;
 
 
     @Override
@@ -296,14 +300,15 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
         Cookie[] cookies = ((HttpServletRequest) request).getCookies();
         try {
+            AtomicReference<String> uv = new AtomicReference<>();
             Runnable addResponseCookieTask = () -> {
-                String uv = UUID.fastUUID().toString();
-                Cookie uvCookie = new Cookie("uv", uv);
+                uv.set(UUID.fastUUID().toString());
+                Cookie uvCookie = new Cookie("uv", uv.get());
                 uvCookie.setMaxAge(60 * 60 * 24 * 30);
                 uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
                 ((HttpServletResponse) response).addCookie(uvCookie);
                 uvFirstFlag.set(Boolean.TRUE);
-                stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv);
+                stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv.get());
             };
             if (ArrayUtil.isNotEmpty(cookies)) {
                 Arrays.stream(cookies)
@@ -311,6 +316,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                         .findFirst()
                         .map(Cookie::getValue)
                         .ifPresentOrElse(cookie -> {
+                            uv.set(cookie);
                             Long uvAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, cookie);
                             uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
                         }, addResponseCookieTask);
@@ -344,21 +350,58 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .build();
             linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
 
+            String os = LinkUtil.getOs((HttpServletRequest) request);
             LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
                     .fullShortUrl(fullShortUrl)
                     .date(new Date())
                     .cnt(1)
-                    .os(LinkUtil.getOs((HttpServletRequest) request))
+                    .os(os)
                     .build();
-            linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
+            linkOsStatsMapper.shortLinkOsStats(linkOsStatsDO);
 
+            String browser = LinkUtil.getBrowser((HttpServletRequest) request);
             LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
                     .fullShortUrl(fullShortUrl)
                     .date(new Date())
                     .cnt(1)
-                    .browser(LinkUtil.getBrowser((HttpServletRequest) request))
+                    .browser(browser)
                     .build();
-            linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
+            linkBrowserStatsMapper.shortLinkBrowserStats(linkBrowserStatsDO);
+
+            String device = LinkUtil.getDevice((HttpServletRequest) request);
+            LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .cnt(1)
+                    .device(device)
+                    .build();
+            linkDeviceStatsMapper.shortLinkDeviceStats(linkDeviceStatsDO);
+
+            String network = LinkUtil.getNetwork(geoInfo);
+            LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .cnt(1)
+                    .network(network)
+                    .build();
+            linkNetworkStatsMapper.shortLinkNetworkStats(linkNetworkStatsDO);
+
+            LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .user(uv.get())
+                    .browser(browser)
+                    .os(os)
+                    .ip(uip)
+                    .network(network)
+                    .device(device)
+                    .locale(StrBuilder.create(geoInfo.getCountry())
+                            .append("-")
+                            .append(geoInfo.getProvince())
+                            .append("-")
+                            .append(geoInfo.getCity())
+                            .toString())
+                    .build();
+            linkAccessLogsMapper.insert(linkAccessLogsDO);
         } catch (Exception e) {
             log.error("短链接访问统计失败，fullShortUrl: {}", fullShortUrl, e);
         }

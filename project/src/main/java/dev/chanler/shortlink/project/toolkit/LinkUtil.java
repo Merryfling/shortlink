@@ -2,7 +2,10 @@ package dev.chanler.shortlink.project.toolkit;
 
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
+import dev.chanler.shortlink.project.toolkit.ipgeo.GeoInfo;
+import dev.chanler.shortlink.project.toolkit.ipgeo.IpGeoClient;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 
 import java.util.Date;
 import java.util.Optional;
@@ -13,7 +16,10 @@ import static dev.chanler.shortlink.project.common.constant.LinkConstant.DEFAULT
  * 短链接工具类
  * @author: Chanler
  */
+@RequiredArgsConstructor
 public class LinkUtil {
+
+    private static IpGeoClient ipGeoClient;
 
     /**
      * 获取短链接缓存有效时间
@@ -108,6 +114,11 @@ public class LinkUtil {
         }
     }
 
+    /**
+     * 获取设备类型
+     * @param request HttpServletResponse对象
+     * @return 设备类型
+     */
     public static String getDevice(HttpServletRequest request) {
         String userAgent = request.getHeader("User-Agent").toLowerCase();
         if (userAgent == null) {
@@ -118,5 +129,21 @@ public class LinkUtil {
         } else {
             return "Desktop";
         }
+    }
+
+    /**
+     * 获取网络类型
+     * @param geoInfo GeoInfo 对象
+     * @return 网络类型
+     */
+    public static String getNetwork(GeoInfo geoInfo) {
+        if (geoInfo == null) {
+            return "Unknown";
+        }
+        String isp = geoInfo.getIsp();
+        if (isp == null) {
+            return "Unknown";
+        }
+        return isp;
     }
 }
