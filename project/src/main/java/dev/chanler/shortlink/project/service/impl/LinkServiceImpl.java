@@ -16,14 +16,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.project.common.convention.exception.ClientException;
 import dev.chanler.shortlink.project.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.project.common.enums.ValidDateTypeEnum;
-import dev.chanler.shortlink.project.dao.entity.LinkAccessStatsDO;
-import dev.chanler.shortlink.project.dao.entity.LinkDO;
-import dev.chanler.shortlink.project.dao.entity.LinkGotoDO;
-import dev.chanler.shortlink.project.dao.entity.LinkLocaleStatsDO;
-import dev.chanler.shortlink.project.dao.mapper.LinkAccessStatsMapper;
-import dev.chanler.shortlink.project.dao.mapper.LinkGotoMapper;
-import dev.chanler.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
-import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
+import dev.chanler.shortlink.project.dao.entity.*;
+import dev.chanler.shortlink.project.dao.mapper.*;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkUpdateReqDTO;
@@ -80,6 +74,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final IpGeoClient ipGeoClient;
+    private final LinkOsStatsMapper linkOsStatsMapper;
 
 
     @Override
@@ -347,6 +342,14 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .country(StrUtil.isBlank(geoInfo.getCountry()) ? "未知" : geoInfo.getCountry())
                     .build();
             linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
+
+            LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .cnt(1)
+                    .os(LinkUtil.getOs((HttpServletRequest) request))
+                    .build();
+            linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
         } catch (Exception e) {
             log.error("短链接访问统计失败，fullShortUrl: {}", fullShortUrl, e);
         }

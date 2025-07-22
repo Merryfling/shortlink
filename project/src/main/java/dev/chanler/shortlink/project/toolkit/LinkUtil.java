@@ -55,4 +55,29 @@ public class LinkUtil {
         }
         return request.getRemoteAddr();
     }
+
+    /**
+     * 获取操作系统
+     * @param request HttpServletResponse对象
+     * @return 操作系统
+     */
+    public static String getOs(HttpServletRequest request) {
+        String userAgent = request.getHeader("User-Agent").toLowerCase();
+        if (userAgent == null) {
+            return "Unknown";
+        }
+        if (userAgent.contains("windows")) {
+            return "Windows";
+        } else if (userAgent.contains("mac")) {
+            return "Mac";
+        } else if (userAgent.contains("x11") || userAgent.contains("linux")) {
+            return "Unix";
+        } else if (userAgent.contains("android")) {
+            return "Android";
+        } else if (userAgent.contains("iphone") || userAgent.contains("ipad")) {
+            return "iOS";
+        } else {
+            return "Unknown";
+        }
+    }
 }
