@@ -1,7 +1,10 @@
 package dev.chanler.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -13,8 +16,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.project.common.convention.exception.ClientException;
 import dev.chanler.shortlink.project.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.project.common.enums.ValidDateTypeEnum;
+import dev.chanler.shortlink.project.dao.entity.LinkAccessStatsDO;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dao.entity.LinkGotoDO;
+import dev.chanler.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import dev.chanler.shortlink.project.dao.mapper.LinkGotoMapper;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
@@ -28,6 +33,8 @@ import dev.chanler.shortlink.project.toolkit.HashUtil;
 import dev.chanler.shortlink.project.toolkit.LinkUtil;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,11 +52,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,6 +73,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkGotoMapper linkGotoMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
+    private final LinkAccessStatsMapper linkAccessStatsMapper;
 
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
@@ -195,6 +201,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
         String originUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_SHORT_LINK_KEY), fullShortUrl));
         if (StrUtil.isNotBlank(originUrl)) {
             try {
+                linkStats(fullShortUrl, request, response);
                 ((HttpServletResponse) response).sendRedirect(originUrl);
             } catch (IOException e) {
                 throw new ServiceException("重定向失败");
@@ -225,6 +232,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             originUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_SHORT_LINK_KEY), fullShortUrl));
             if (StrUtil.isNotBlank(originUrl)) {
                 try {
+                    linkStats(fullShortUrl, request, response);
                     ((HttpServletResponse) response).sendRedirect(originUrl);
                 } catch (IOException e) {
                     throw new ServiceException("重定向失败");
@@ -271,12 +279,58 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     TimeUnit.MILLISECONDS
             );
             try {
+                linkStats(fullShortUrl, request, response);
                 ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
             } catch (IOException e) {
                 throw new ServiceException("重定向失败");
             }
         } finally {
             lock.unlock();
+        }
+    }
+
+    private void linkStats(String fullShortUrl, ServletRequest request, ServletResponse response) {
+        AtomicBoolean uvFirstFlag = new AtomicBoolean();
+        Cookie[] cookies = ((HttpServletRequest) request).getCookies();
+        try {
+            Runnable addResponseCookieTask = () -> {
+                String uv = UUID.fastUUID().toString();
+                Cookie uvCookie = new Cookie("uv", uv);
+                uvCookie.setMaxAge(60 * 60 * 24 * 30);
+                uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+                ((HttpServletResponse) response).addCookie(uvCookie);
+                uvFirstFlag.set(Boolean.TRUE);
+                stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, uv);
+            };
+            if (ArrayUtil.isNotEmpty(cookies)) {
+                Arrays.stream(cookies)
+                        .filter(cookie -> Objects.equals(cookie.getName(), "uv"))
+                        .findFirst()
+                        .map(Cookie::getValue)
+                        .ifPresentOrElse(cookie -> {
+                            Long uvAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uv:" + fullShortUrl, cookie);
+                            uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
+                        }, addResponseCookieTask);
+            } else {
+                addResponseCookieTask.run();
+            }
+            String uip = LinkUtil.getActualIp(((HttpServletRequest) request));
+            Long uipAdded = stringRedisTemplate.opsForSet().add("short-link:stats:uip:" + fullShortUrl, uip);
+            Boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
+            int hour = DateUtil.hour(new Date(), true);
+            int weekDay = DateUtil.dayOfWeekEnum(new Date()).getIso8601Value();
+            LinkAccessStatsDO linkAccessStats = LinkAccessStatsDO.builder()
+                    .pv(1)
+                    .uv(uvFirstFlag.get() ? 1 : 0)
+                    .uip(uipFirstFlag ? 1 : 0)
+                    .hour(hour)
+                    .weekday(weekDay)
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .build();
+            linkAccessStatsMapper.shortLinkStats(linkAccessStats);
+        } catch (Exception e) {
+            log.error("短链接访问统计失败，fullShortUrl: {}", fullShortUrl, e);
         }
     }
 
