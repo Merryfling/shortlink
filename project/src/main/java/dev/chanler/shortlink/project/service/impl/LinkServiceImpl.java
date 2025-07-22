@@ -19,8 +19,10 @@ import dev.chanler.shortlink.project.common.enums.ValidDateTypeEnum;
 import dev.chanler.shortlink.project.dao.entity.LinkAccessStatsDO;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dao.entity.LinkGotoDO;
+import dev.chanler.shortlink.project.dao.entity.LinkLocaleStatsDO;
 import dev.chanler.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import dev.chanler.shortlink.project.dao.mapper.LinkGotoMapper;
+import dev.chanler.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
@@ -31,6 +33,8 @@ import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.LinkService;
 import dev.chanler.shortlink.project.toolkit.HashUtil;
 import dev.chanler.shortlink.project.toolkit.LinkUtil;
+import dev.chanler.shortlink.project.toolkit.ipgeo.GeoInfo;
+import dev.chanler.shortlink.project.toolkit.ipgeo.IpGeoClient;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.Cookie;
@@ -74,6 +78,9 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
+    private final LinkLocaleStatsMapper linkLocaleStatsMapper;
+    private final IpGeoClient ipGeoClient;
+
 
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
@@ -328,7 +335,18 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .fullShortUrl(fullShortUrl)
                     .date(new Date())
                     .build();
-            linkAccessStatsMapper.shortLinkStats(linkAccessStats);
+            linkAccessStatsMapper.shortLinkAccessStats(linkAccessStats);
+            GeoInfo geoInfo = ipGeoClient.query(uip);
+            LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .cnt(1)
+                    .province(StrUtil.isBlank(geoInfo.getProvince()) ? "未知" : geoInfo.getProvince())
+                    .city(StrUtil.isBlank(geoInfo.getCity()) ? "未知" : geoInfo.getCity())
+                    .adcode(StrUtil.isBlank(geoInfo.getAdcode()) ? "未知" : geoInfo.getAdcode())
+                    .country(StrUtil.isBlank(geoInfo.getCountry()) ? "未知" : geoInfo.getCountry())
+                    .build();
+            linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
         } catch (Exception e) {
             log.error("短链接访问统计失败，fullShortUrl: {}", fullShortUrl, e);
         }
