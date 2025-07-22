@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinLinkPageReqDTO;
+import dev.chanler.shortlink.project.dto.req.RecycleBinRestoreReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 
@@ -24,4 +25,10 @@ public interface RecycleBinService extends IService<LinkDO> {
      * @return IPage<LinkPageRespDTO>
      */
     IPage<LinkPageRespDTO> pageRecycledBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO);
+
+    /**
+     * 恢复短链接
+     * @param recycleBinRestoreReqDTO 恢复请求参数
+     */
+    void restoreLink(RecycleBinRestoreReqDTO recycleBinRestoreReqDTO);
 }

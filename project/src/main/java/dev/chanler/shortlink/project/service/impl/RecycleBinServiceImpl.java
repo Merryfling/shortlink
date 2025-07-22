@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
 import dev.chanler.shortlink.project.dto.req.RecycleBinLinkPageReqDTO;
+import dev.chanler.shortlink.project.dto.req.RecycleBinRestoreReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.RecycleBinService;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.GOTO_IS_NULL_SHORT_LINK_KEY;
 import static dev.chanler.shortlink.project.common.constant.RedisKeyConstant.GOTO_SHORT_LINK_KEY;
 
 /**
@@ -57,5 +59,21 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
             bean.setDomain("http://" + bean.getDomain());
             return bean;
         });
+    }
+
+    @Override
+    public void restoreLink(RecycleBinRestoreReqDTO recycleBinRestoreReqDTO) {
+        LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
+                .eq(LinkDO::getFullShortUrl, recycleBinRestoreReqDTO.getFullShortUrl())
+                .eq(LinkDO::getGid, recycleBinRestoreReqDTO.getGid())
+                .eq(LinkDO::getEnableStatus, 1)
+                .eq(LinkDO::getDelFlag, 0);
+        LinkDO linkDO = LinkDO.builder()
+                .enableStatus(0)
+                .build();
+        baseMapper.update(linkDO, updateWrapper);
+        stringRedisTemplate.delete(
+                String.format(GOTO_IS_NULL_SHORT_LINK_KEY, recycleBinRestoreReqDTO.getFullShortUrl())
+        );
     }
 }
