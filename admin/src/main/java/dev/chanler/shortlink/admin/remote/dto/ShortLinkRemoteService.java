@@ -113,4 +113,15 @@ public interface ShortLinkRemoteService {
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
+
+    /**
+     * 从回收站移除短链接
+     * @param recycleBinRemoveReqDTO 回收站移除请求参数
+     * @return Result<Void>
+     */
+    default Result<Void> removeLink(RecycleBinRemoveReqDTO recycleBinRemoveReqDTO) {
+        String resultStr = HttpUtil.post("http://localhost:8001/api/short-link/v1/recycle-bin/remove", JSON.toJSONString(recycleBinRemoveReqDTO));
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
 }

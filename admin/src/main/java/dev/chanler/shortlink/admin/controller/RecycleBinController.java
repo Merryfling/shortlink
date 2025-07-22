@@ -2,8 +2,10 @@ package dev.chanler.shortlink.admin.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
+import dev.chanler.shortlink.admin.common.convention.result.Results;
 import dev.chanler.shortlink.admin.remote.dto.ShortLinkRemoteService;
 import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinLinkPageReqDTO;
+import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinRemoveReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinRestoreReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkPageRespDTO;
@@ -55,5 +57,15 @@ public class RecycleBinController {
     @PostMapping("/api/short-link/admin/v1/recycle-bin/restore")
     public Result<Void> restoreLink(@RequestBody RecycleBinRestoreReqDTO recycleBinRestoreReqDTO) {
         return shortLinkRemoteService.recycleBinService(recycleBinRestoreReqDTO);
+    }
+
+    /**
+     * 从回收站移除短链接
+     * @param recycleBinRemoveReqDTO 回收站移除请求参数
+     * @return Result<Void>
+     */
+    @PostMapping("/api/short-link/admin/v1/recycle-bin/remove")
+    public Result<Void> removeLink(@RequestBody RecycleBinRemoveReqDTO recycleBinRemoveReqDTO) {
+        return shortLinkRemoteService.removeLink(recycleBinRemoveReqDTO);
     }
 }
