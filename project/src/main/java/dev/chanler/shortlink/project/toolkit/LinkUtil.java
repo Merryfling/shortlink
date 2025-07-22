@@ -107,4 +107,16 @@ public class LinkUtil {
             return "Unknown";
         }
     }
+
+    public static String getDevice(HttpServletRequest request) {
+        String userAgent = request.getHeader("User-Agent").toLowerCase();
+        if (userAgent == null) {
+            return "Unknown";
+        }
+        if (userAgent.contains("mobile")) {
+            return "Mobile";
+        } else {
+            return "Desktop";
+        }
+    }
 }
