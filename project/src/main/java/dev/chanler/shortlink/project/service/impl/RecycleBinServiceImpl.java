@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
 import dev.chanler.shortlink.project.dto.req.RecycleBinLinkPageReqDTO;
+import dev.chanler.shortlink.project.dto.req.RecycleBinRemoveReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinRestoreReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
@@ -75,5 +76,18 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
         stringRedisTemplate.delete(
                 String.format(GOTO_IS_NULL_SHORT_LINK_KEY, recycleBinRestoreReqDTO.getFullShortUrl())
         );
+    }
+
+    @Override
+    public void removeLink(RecycleBinRemoveReqDTO recycleBinRemoveReqDTO) {
+        LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
+                .eq(LinkDO::getFullShortUrl, recycleBinRemoveReqDTO.getFullShortUrl())
+                .eq(LinkDO::getGid, recycleBinRemoveReqDTO.getGid())
+                .eq(LinkDO::getEnableStatus, 1)
+                .eq(LinkDO::getDelFlag, 0);
+        LinkDO linkDO = LinkDO.builder()
+                .enableStatus(0)
+                .build();
+        baseMapper.delete(linkDO, updateWrapper);
     }
 }
