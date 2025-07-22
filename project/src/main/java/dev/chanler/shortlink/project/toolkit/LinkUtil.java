@@ -80,4 +80,31 @@ public class LinkUtil {
             return "Unknown";
         }
     }
+
+    /**
+     * 获取浏览器
+     * @param request HttpServletResponse对象
+     * @return 浏览器
+     */
+    public static String getBrowser(HttpServletRequest request) {
+        String userAgent = request.getHeader("User-Agent").toLowerCase();
+        if (userAgent == null) {
+            return "Unknown";
+        }
+        if (userAgent.contains("edg")) {
+            return "Edge";
+        } else if (userAgent.contains("msie") || userAgent.contains("trident")) {
+            return "Internet Explorer";
+        } else if (userAgent.contains("chrome")) {
+            return "Chrome";
+        } else if (userAgent.contains("safari") && !userAgent.contains("chrome")) {
+            return "Safari";
+        } else if (userAgent.contains("firefox")) {
+            return "Firefox";
+        } else if (userAgent.contains("opera") || userAgent.contains("opr")) {
+            return "Opera";
+        } else {
+            return "Unknown";
+        }
+    }
 }
