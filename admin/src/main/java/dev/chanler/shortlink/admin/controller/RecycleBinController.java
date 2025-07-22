@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.remote.dto.ShortLinkRemoteService;
 import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinLinkPageReqDTO;
+import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinRestoreReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkPageRespDTO;
+import dev.chanler.shortlink.admin.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class RecycleBinController {
 
-    private final
+    private final RecycleBinService recycleBinService;
 
     ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
     };
@@ -42,6 +44,16 @@ public class RecycleBinController {
      */
     @GetMapping("/api/short-link/admin/v1/recycle-bin/page")
     public Result<IPage<LinkPageRespDTO>> pageLink(@RequestBody RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
-        return shortLinkRemoteService.pageRecycleBinLink(recycleBinLinkPageReqDTO);
+        return recycleBinService.pageRecycleBinLink(recycleBinLinkPageReqDTO);
+    }
+
+    /**
+     * 恢复短链接
+     * @param recycleBinRestoreReqDTO 恢复请求参数
+     * @return Result<Void>
+     */
+    @PostMapping("/api/short-link/admin/v1/recycle-bin/restore")
+    public Result<Void> restoreLink(@RequestBody RecycleBinRestoreReqDTO recycleBinRestoreReqDTO) {
+        return shortLinkRemoteService.recycleBinService(recycleBinRestoreReqDTO);
     }
 }

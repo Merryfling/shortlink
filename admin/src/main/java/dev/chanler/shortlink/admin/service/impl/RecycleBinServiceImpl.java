@@ -31,11 +31,8 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
     };
 
-    /**
-     * 分页查询回收站
-     * @param recycleBinLinkPageReqDTO
-     */
-    Result<IPage<LinkPageRespDTO>> pageRecycleBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
+    @Override
+    public Result<IPage<LinkPageRespDTO>> pageRecycleBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getUsername, UserContext.getUsername())
                 .eq(GroupDO::getDelFlag, 0);
