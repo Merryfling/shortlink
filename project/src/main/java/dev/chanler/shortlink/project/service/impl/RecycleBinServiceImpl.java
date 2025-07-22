@@ -8,7 +8,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
 import dev.chanler.shortlink.project.dao.mapper.LinkMapper;
-import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
+import dev.chanler.shortlink.project.dto.req.RecycleBinLinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.RecycleBinService;
@@ -45,13 +45,13 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
     }
 
     @Override
-    public IPage<LinkPageRespDTO> pageLink(LinkPageReqDTO linkPageReqDTO) {
+    public IPage<LinkPageRespDTO> pageRecycledBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
         LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
                 .eq(LinkDO::getDelFlag, 0)
-                .eq(LinkDO::getGid, linkPageReqDTO.getGid())
+                .in(LinkDO::getGid, recycleBinLinkPageReqDTO.getGidList())
                 .eq(LinkDO::getEnableStatus, 1)
-                .orderByDesc(LinkDO::getCreateTime);
-        IPage<LinkDO> resultPage = baseMapper.selectPage(linkPageReqDTO, queryWrapper);
+                .orderByDesc(LinkDO::getUpdateTime);
+        IPage<LinkDO> resultPage = baseMapper.selectPage(recycleBinLinkPageReqDTO, queryWrapper);
         return resultPage.convert(each -> {
             LinkPageRespDTO bean = BeanUtil.toBean(each, LinkPageRespDTO.class);
             bean.setDomain("http://" + bean.getDomain());

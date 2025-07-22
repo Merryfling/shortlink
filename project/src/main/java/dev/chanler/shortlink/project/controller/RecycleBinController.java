@@ -3,7 +3,7 @@ package dev.chanler.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.project.common.convention.result.Result;
 import dev.chanler.shortlink.project.common.convention.result.Results;
-import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
+import dev.chanler.shortlink.project.dto.req.RecycleBinLinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.RecycleBinService;
@@ -36,11 +36,11 @@ public class RecycleBinController {
 
     /**
      * 短链接分页查询
-     * @param linkPageReqDTO 分页请求参数
+     * @param recycleBinLinkPageReqDTO 分页请求参数
      * @return Result<IPage<LinkPageRespDTO>>
      */
     @GetMapping("/api/short-link/v1/recycle-bin/page")
-    public Result<IPage<LinkPageRespDTO>> pageLink(LinkPageReqDTO linkPageReqDTO) {
-        return Results.success(recycleBinService.pageLink(linkPageReqDTO));
+    public Result<IPage<LinkPageRespDTO>> pageRecycledBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
+        return Results.success(recycleBinService.pageRecycledBinLink(recycleBinLinkPageReqDTO));
     }
 }
