@@ -5,10 +5,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
-import dev.chanler.shortlink.admin.remote.dto.req.LinkCreateReqDTO;
-import dev.chanler.shortlink.admin.remote.dto.req.LinkPageReqDTO;
-import dev.chanler.shortlink.admin.remote.dto.req.LinkUpdateReqDTO;
-import dev.chanler.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
+import dev.chanler.shortlink.admin.remote.dto.req.*;
 import dev.chanler.shortlink.admin.remote.dto.resp.GroupLinkCountQueryRespDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkPageRespDTO;
@@ -94,14 +91,14 @@ public interface ShortLinkRemoteService {
 
     /**
      * 回收站分页查询
-     * @param linkPageReqDTO 分页请求参数
+     * @param recycleBinLinkPageReqDTO 分页请求参数
      * @return Result<IPage<LinkPageRespDTO>>
      */
-    default Result<IPage<LinkPageRespDTO>> pageRecycleBinLink(LinkPageReqDTO linkPageReqDTO) {
+    default Result<IPage<LinkPageRespDTO>> pageRecycleBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
         Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("gid", linkPageReqDTO.getGid());
-        requestMap.put("current", linkPageReqDTO.getCurrent());
-        requestMap.put("size", linkPageReqDTO.getSize());
+        requestMap.put("gidList", recycleBinLinkPageReqDTO.getGidList());
+        requestMap.put("current", recycleBinLinkPageReqDTO.getCurrent());
+        requestMap.put("size", recycleBinLinkPageReqDTO.getSize());
         String resultPageStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/recycle-bin/page", requestMap);
         return JSON.parseObject(resultPageStr, new TypeReference<>() {
         });
