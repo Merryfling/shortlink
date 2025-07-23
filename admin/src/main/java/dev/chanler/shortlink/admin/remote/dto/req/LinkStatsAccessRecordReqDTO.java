@@ -1,7 +1,6 @@
 package dev.chanler.shortlink.admin.remote.dto.req;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import dev.chanler.shortlink.project.dao.entity.LinkAccessLogsDO;
 import lombok.Data;
 
 /**
@@ -9,7 +8,7 @@ import lombok.Data;
  * @author: Chanler
  */
 @Data
-public class LinkStatsAccessRecordReqDTO extends Page<LinkAccessLogsDO> {
+public class LinkStatsAccessRecordReqDTO extends Page {
 
     /**
      * 完整短链接
