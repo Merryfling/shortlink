@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 短链接访问日志持久层
@@ -86,4 +87,45 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "        tlal.user " +
             ") AS user_counts;")
     HashMap<String, Object> findUvTypeCntByShortLink(@Param("param") LinkStatsReqDTO linkStatsReqDTO);
+
+    /**
+     * 根据短链接和用户列表获取新旧访客类型
+     * @param gid 分组标识
+     * @param fullShortUrl 完整短链接
+     * @param enableStatus 启用状态
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @param userAccessLogsList 用户列表
+     * @return 用户新旧访客类型列表
+     */
+    @Select("<script> " +
+            "SELECT " +
+            "    tlal.user, " +
+            "    CASE " +
+            "        WHEN MIN(tlal.create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客' " +
+            "        ELSE '老访客' " +
+            "    END AS uvType " +
+            "FROM " +
+            "    t_link tl INNER JOIN " +
+            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
+            "WHERE " +
+            "    tlal.full_short_url = #{fullShortUrl} " +
+            "    AND tl.gid = #{gid} " +
+            "    AND tl.del_flag = '0' " +
+            "    AND tl.enable_status = #{enableStatus} " +
+            "    AND tlal.user IN " +
+            "    <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'> " +
+            "        #{item} " +
+            "    </foreach> " +
+            "GROUP BY " +
+            "    tlal.user;" +
+            "</script>")
+    List<Map<String, Object>> selectUvTypeByUsers(
+            @Param("gid") String gid,
+            @Param("fullShortUrl") String fullShortUrl,
+            @Param("enableStatus") Integer enableStatus,
+            @Param("startDate") String startDate,
+            @Param("endDate") String endDate,
+            @Param("userAccessLogsList") List<String> userAccessLogsList
+    );
 }

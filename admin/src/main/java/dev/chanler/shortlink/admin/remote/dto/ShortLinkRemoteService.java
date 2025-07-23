@@ -1,14 +1,13 @@
 package dev.chanler.shortlink.admin.remote.dto;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.remote.dto.req.*;
-import dev.chanler.shortlink.admin.remote.dto.resp.GroupLinkCountQueryRespDTO;
-import dev.chanler.shortlink.admin.remote.dto.resp.LinkCreateRespDTO;
-import dev.chanler.shortlink.admin.remote.dto.resp.LinkPageRespDTO;
+import dev.chanler.shortlink.admin.remote.dto.resp.*;
 
 import java.util.HashMap;
 import java.util.List;
@@ -121,6 +120,28 @@ public interface ShortLinkRemoteService {
      */
     default Result<Void> removeLink(RecycleBinRemoveReqDTO recycleBinRemoveReqDTO) {
         String resultStr = HttpUtil.post("http://localhost:8001/api/short-link/v1/recycle-bin/remove", JSON.toJSONString(recycleBinRemoveReqDTO));
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 访问单个短链接指定时间内监控数据
+     * @param linkStatsReqDTO
+     * @return 短链接监控数据
+     */
+    default LinkStatsRespDTO oneShortLinkStats(LinkStatsReqDTO linkStatsReqDTO) {
+        String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/stats", BeanUtil.beanToMap(linkStatsReqDTO));
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 访问单个短链接指定时间内访问记录监控数据
+     * @param linkStatsAccessRecordReqDTO 获取短链接监控访问记录数据入参
+     * @return 访问记录监控数据
+     */
+    default IPage<LinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(LinkStatsAccessRecordReqDTO linkStatsAccessRecordReqDTO) {
+        String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/stats/access-record", BeanUtil.beanToMap(linkStatsAccessRecordReqDTO));
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }

@@ -1,14 +1,18 @@
 package dev.chanler.shortlink.project.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateField;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.chanler.shortlink.project.common.biz.user.UserContext;
 import dev.chanler.shortlink.project.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.project.dao.entity.*;
 import dev.chanler.shortlink.project.dao.mapper.*;
+import dev.chanler.shortlink.project.dto.req.LinkStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsReqDTO;
 import dev.chanler.shortlink.project.dto.resp.*;
 import dev.chanler.shortlink.project.service.LinkStatsService;
@@ -36,7 +40,7 @@ public class LinkStatsServiceImpl implements LinkStatsService {
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
 
     @Override
-    public ShortLinkStatsRespDTO oneShortLinkStats(LinkStatsReqDTO linkStatsReqDTO) {
+    public LinkStatsRespDTO oneShortLinkStats(LinkStatsReqDTO linkStatsReqDTO) {
         checkGroupBelongToUser(linkStatsReqDTO.getGid());
         List<LinkAccessStatsDO> listStatsByShortLink = linkAccessStatsMapper.listStatsByShortLink(linkStatsReqDTO);
         if (CollUtil.isEmpty(listStatsByShortLink)) {
@@ -215,7 +219,7 @@ public class LinkStatsServiceImpl implements LinkStatsService {
                     .build();
             networkStats.add(networkRespDTO);
         });
-        return ShortLinkStatsRespDTO.builder()
+        return LinkStatsRespDTO.builder()
                 .pv(pvUvUidStatsByShortLink.getPv())
                 .uv(pvUvUidStatsByShortLink.getUv())
                 .uip(pvUvUidStatsByShortLink.getUip())
@@ -230,6 +234,42 @@ public class LinkStatsServiceImpl implements LinkStatsService {
                 .deviceStats(deviceStats)
                 .networkStats(networkStats)
                 .build();
+    }
+
+    @Override
+    public IPage<LinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(LinkStatsAccessRecordReqDTO linkStatsAccessRecordReqDTO) {
+        checkGroupBelongToUser(linkStatsAccessRecordReqDTO.getGid());
+        LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
+                .eq(LinkAccessLogsDO::getFullShortUrl, linkStatsAccessRecordReqDTO.getFullShortUrl())
+                .between(LinkAccessLogsDO::getCreateTime, linkStatsAccessRecordReqDTO.getStartDate(), linkStatsAccessRecordReqDTO.getEndDate())
+                .eq(LinkAccessLogsDO::getDelFlag, 0)
+                .orderByDesc(LinkAccessLogsDO::getCreateTime);
+        IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectPage(linkStatsAccessRecordReqDTO, queryWrapper);
+        if (CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
+            return new Page<>();
+        }
+        IPage<LinkStatsAccessRecordRespDTO> actualResult = linkAccessLogsDOIPage.convert(each -> BeanUtil.toBean(each, LinkStatsAccessRecordRespDTO.class));
+        List<String> userAccessLogsList = actualResult.getRecords().stream()
+                .map(LinkStatsAccessRecordRespDTO::getUser)
+                .toList();
+        List<Map<String, Object>> uvTypeList = linkAccessLogsMapper.selectUvTypeByUsers(
+                linkStatsAccessRecordReqDTO.getGid(),
+                linkStatsAccessRecordReqDTO.getFullShortUrl(),
+                linkStatsAccessRecordReqDTO.getEnableStatus(),
+                linkStatsAccessRecordReqDTO.getStartDate(),
+                linkStatsAccessRecordReqDTO.getEndDate(),
+                userAccessLogsList
+        );
+        actualResult.getRecords().forEach(each -> {
+            String uvType = uvTypeList.stream()
+                    .filter(item -> Objects.equals(each.getUser(), item.get("user")))
+                    .findFirst()
+                    .map(item -> item.get("uvType"))
+                    .map(Object::toString)
+                    .orElse("旧访客");
+            each.setUvType(uvType);
+        });
+        return actualResult;
     }
 
     public void checkGroupBelongToUser(String gid) throws ServiceException {

@@ -1,4 +1,4 @@
-package dev.chanler.shortlink.project.dto.resp;
+package dev.chanler.shortlink.admin.remote.dto.resp;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +15,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ShortLinkStatsRespDTO {
+public class LinkStatsRespDTO {
 
     /**
      * 访问量
