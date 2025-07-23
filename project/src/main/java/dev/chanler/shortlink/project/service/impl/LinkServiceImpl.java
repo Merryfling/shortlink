@@ -343,10 +343,10 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .fullShortUrl(fullShortUrl)
                     .date(new Date())
                     .cnt(1)
-                    .province(StrUtil.isBlank(geoInfo.getProvince()) ? "未知" : geoInfo.getProvince())
-                    .city(StrUtil.isBlank(geoInfo.getCity()) ? "未知" : geoInfo.getCity())
-                    .adcode(StrUtil.isBlank(geoInfo.getAdcode()) ? "未知" : geoInfo.getAdcode())
-                    .country(StrUtil.isBlank(geoInfo.getCountry()) ? "未知" : geoInfo.getCountry())
+                    .province(geoInfo.getProvince())
+                    .city(geoInfo.getCity())
+                    .adcode(geoInfo.getAdcode())
+                    .country(geoInfo.getCountry())
                     .build();
             linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
 

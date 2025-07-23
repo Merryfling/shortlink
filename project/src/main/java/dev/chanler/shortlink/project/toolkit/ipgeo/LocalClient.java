@@ -27,10 +27,10 @@ public class LocalClient implements IpGeoClient {
         try {
             String region = searcher.search(ip);
             String[] a = region == null ? new String[0] : region.split("\\|", -1);
-            String country  = a.length > 0 ? a[0] : null;
-            String province = a.length > 2 ? a[2] : null;
-            String city     = a.length > 3 ? a[3] : null;
-            String isp      = a.length > 4 ? a[4] : null;
+            String country  = a.length > 0 ? a[0] : "Unknown";
+            String province = a.length > 2 ? a[2] : "Unknown";
+            String city     = a.length > 3 ? a[3] : "Unknown";
+            String isp      = a.length > 4 ? a[4] : "Unknown";
             return GeoInfo.builder()
                     .country(country)
                     .province(province)

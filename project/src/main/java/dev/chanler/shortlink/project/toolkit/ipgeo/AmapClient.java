@@ -60,7 +60,7 @@ public class AmapClient implements IpGeoClient {
     private static String normalize(String v) {
         if (v == null) return null;
         String s = v.trim();
-        return (s.isEmpty() || "[]".equals(s)) ? null : s;
+        return (s.isEmpty() || "[]".equals(s)) ? "Unknown" : s;
     }
 
     @Data
