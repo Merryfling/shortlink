@@ -3,6 +3,7 @@ package dev.chanler.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.project.common.convention.result.Result;
 import dev.chanler.shortlink.project.common.convention.result.Results;
+import dev.chanler.shortlink.project.dto.req.GroupStatsReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkStatsAccessRecordRespDTO;
@@ -30,6 +31,16 @@ public class LinkStatsController {
     @GetMapping("/api/short-link/v1/stats")
     public Result<LinkStatsRespDTO> shortLinkStats(LinkStatsReqDTO linkStatsReqDTO) {
         return Results.success(linkStatsService.oneShortLinkStats(linkStatsReqDTO));
+    }
+
+    /**
+     * 访问分组短链接指定时间内监控数据
+     * @param groupStatsReqDTO 获取短链接监控数据入参
+     * @return 短链接监控数据
+     */
+    @GetMapping("/api/short-link/v1/stats/group")
+    public Result<LinkStatsRespDTO> groupShortLinkStats(GroupStatsReqDTO groupStatsReqDTO) {
+        return Results.success(linkStatsService.groupShortLinkStats(groupStatsReqDTO));
     }
 
     /**

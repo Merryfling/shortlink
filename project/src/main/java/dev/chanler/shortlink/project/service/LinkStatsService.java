@@ -1,6 +1,7 @@
 package dev.chanler.shortlink.project.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import dev.chanler.shortlink.project.dto.req.GroupStatsReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsReqDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkStatsAccessRecordRespDTO;
@@ -25,4 +26,11 @@ public interface LinkStatsService {
      * @return 访问记录监控数据
      */
     IPage<LinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(LinkStatsAccessRecordReqDTO linkStatsAccessRecordReqDTO);
+
+    /**
+     * 获取分组短链接监控数据
+     * @param groupStatsReqDTO 获取分组短链接监控数据入参
+     * @return 短链接监控数据
+     */
+    LinkStatsRespDTO groupShortLinkStats(GroupStatsReqDTO groupStatsReqDTO);
 }

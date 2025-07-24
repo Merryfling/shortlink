@@ -3,6 +3,7 @@ package dev.chanler.shortlink.project.dao.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import dev.chanler.shortlink.project.dao.entity.LinkAccessLogsDO;
 import dev.chanler.shortlink.project.dao.entity.LinkAccessStatsDO;
+import dev.chanler.shortlink.project.dto.req.GroupStatsReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsReqDTO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -39,6 +40,24 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
     LinkAccessStatsDO findPvUvUidStatsByShortLink(@Param("param") LinkStatsReqDTO linkStatsReqDTO);
 
     /**
+     * 根据分组获取指定日期内PV、UV、UIP数据
+     */
+    @Select("""
+            SELECT
+                COUNT(tlal.user)              AS pv,
+                COUNT(DISTINCT tlal.user)     AS uv,
+                COUNT(DISTINCT tlal.ip)       AS uip
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url
+            WHERE tl.gid = #{param.gid}
+              AND tl.del_flag = '0'
+              AND tl.enable_status = '0'
+              AND tlal.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY tl.gid
+            """)
+    LinkAccessStatsDO findPvUvUidStatsByGroup(@Param("param") GroupStatsReqDTO groupStatsReqDTO);
+
+    /**
      * 根据短链接获取指定日期内高频访问IP数据
      * @param linkStatsReqDTO 统计请求参数
      * @return 高频访问IP列表
@@ -61,6 +80,33 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "    count DESC " +
             "LIMIT 5;")
     List<HashMap<String, Object>> listTopIpByShortLink(@Param("param") LinkStatsReqDTO linkStatsReqDTO);
+
+    /**
+     * 根据分组获取指定日期内高频访问IP数据
+     * @param groupStatsReqDTO 统计请求参数
+     * @return 高频访问IP列表
+     */
+    @Select("""
+            SELECT
+                tlal.ip
+                COUNT(tlal.ip) AS count
+            FROM
+                t_link tl
+            INNER JOIN t_link_access_logs tlal
+                ON tl.full_short_url = tlal.full_short_url
+            WHERE
+                tl.gid = #{param.gid}
+                AND tl.del_flag = '0'
+                AND tl.enable_status = '0'
+                AND tlal.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY
+                tl.gid
+                tlal.ip
+            ORDER BY
+                count DESC
+            LIMIT 5
+            """)
+    List<HashMap<String, Object>> listTopIpByGroup(@Param("param") GroupStatsReqDTO groupStatsReqDTO);
 
     /**
      * 根据短链接获取指定日期内新旧访客数据
