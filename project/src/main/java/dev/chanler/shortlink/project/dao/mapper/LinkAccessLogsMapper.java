@@ -18,25 +18,24 @@ import java.util.Map;
 public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
 
     /**
-     * 根据短链接获取指定日期内PV、UV、UIP数据
+     * 根据短链接获取指定日期内 PV UV UIP 数据
      * @param linkStatsReqDTO 统计请求参数
      * @return 访问统计数据
      */
-    @Select("SELECT " +
-            "    COUNT(tlal.user) AS pv, " +
-            "    COUNT(DISTINCT tlal.user) AS uv, " +
-            "    COUNT(DISTINCT tlal.ip) AS uip " +
-            "FROM " +
-            "    t_link tl INNER JOIN " +
-            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
-            "WHERE " +
-            "    tlal.full_short_url = #{param.fullShortUrl} " +
-            "    AND tl.gid = #{param.gid} " +
-            "    AND tl.del_flag = '0' " +
-            "    AND tl.enable_status = #{param.enableStatus} " +
-            "    AND tlal.create_time BETWEEN #{param.startDate} and #{param.endDate} " +
-            "GROUP BY " +
-            "    tlal.full_short_url, tl.gid;")
+    @Select("""
+            SELECT
+                COUNT(tlal.user) AS pv,
+                COUNT(DISTINCT tlal.user) AS uv,
+                COUNT(DISTINCT tlal.ip) AS uip
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url
+            WHERE tlal.full_short_url = #{param.fullShortUrl}
+              AND tl.gid = #{param.gid}
+              AND tl.del_flag = '0'
+              AND tl.enable_status = #{param.enableStatus}
+              AND tlal.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY tlal.full_short_url, tl.gid
+            """)
     LinkAccessStatsDO findPvUvUidStatsByShortLink(@Param("param") LinkStatsReqDTO linkStatsReqDTO);
 
     /**
