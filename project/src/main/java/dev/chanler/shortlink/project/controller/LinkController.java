@@ -3,10 +3,12 @@ package dev.chanler.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.project.common.convention.result.Result;
 import dev.chanler.shortlink.project.common.convention.result.Results;
+import dev.chanler.shortlink.project.dto.req.LinkBatchCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkUpdateReqDTO;
 import dev.chanler.shortlink.project.dto.resp.GroupLinkCountQueryRespDTO;
+import dev.chanler.shortlink.project.dto.resp.LinkBatchCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import dev.chanler.shortlink.project.service.LinkService;
@@ -27,10 +29,10 @@ public class LinkController {
 
     private final LinkService linkService;
 
+
     @GetMapping("/{shortUri}")
     public void restoreUrl(@PathVariable String shortUri, ServletRequest request, ServletResponse response) {
         linkService.restoreUrl(shortUri, request, response);
-
     }
 
     /**
@@ -40,6 +42,14 @@ public class LinkController {
     @PostMapping("/api/short-link/v1/create")
     public Result<LinkCreateRespDTO> createLink(@RequestBody LinkCreateReqDTO linkCreateReqDTO) {
         return Results.success(linkService.createLink(linkCreateReqDTO));
+    }
+
+    /**
+     * 批量创建短链接
+     */
+    @PostMapping("/api/short-link/v1/create/batch")
+    public Result<LinkBatchCreateRespDTO> batchCreateShortLink(@RequestBody LinkBatchCreateReqDTO linkBatchCreateReqDTO) {
+        return Results.success(linkService.batchCreateLink(linkBatchCreateReqDTO));
     }
 
     /**

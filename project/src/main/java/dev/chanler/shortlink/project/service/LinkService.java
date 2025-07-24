@@ -3,10 +3,12 @@ package dev.chanler.shortlink.project.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
+import dev.chanler.shortlink.project.dto.req.LinkBatchCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkUpdateReqDTO;
 import dev.chanler.shortlink.project.dto.resp.GroupLinkCountQueryRespDTO;
+import dev.chanler.shortlink.project.dto.resp.LinkBatchCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.project.dto.resp.LinkPageRespDTO;
 import jakarta.servlet.ServletRequest;
@@ -54,4 +56,12 @@ public interface LinkService extends IService<LinkDO> {
      * @param response HttpServerResponse
      */
     void restoreUrl(String shortUri, ServletRequest request, ServletResponse response);
+
+    /**
+     * 批量创建短链接
+     * @param linkBatchCreateReqDTO 短链接批量创建请求参数
+     * @return LinkBatchCreateRespDTO
+     */
+    LinkBatchCreateRespDTO batchCreateLink(LinkBatchCreateReqDTO linkBatchCreateReqDTO);
+
 }

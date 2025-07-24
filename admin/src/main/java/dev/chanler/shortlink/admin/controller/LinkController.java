@@ -4,12 +4,17 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.admin.common.convention.result.Result;
 import dev.chanler.shortlink.admin.common.convention.result.Results;
 import dev.chanler.shortlink.admin.remote.dto.ShortLinkRemoteService;
+import dev.chanler.shortlink.admin.remote.dto.req.LinkBatchCreateReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.admin.remote.dto.req.LinkUpdateReqDTO;
+import dev.chanler.shortlink.admin.remote.dto.resp.LinkBatchCreateRespDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkCreateRespDTO;
 import dev.chanler.shortlink.admin.remote.dto.resp.LinkPageRespDTO;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 短链接后管控制层
@@ -29,6 +34,14 @@ public class LinkController {
     @PostMapping("/api/short-link/admin/v1/create")
     public Result<LinkCreateRespDTO> createLink(@RequestBody LinkCreateReqDTO linkCreateReqDTO) {
         return shortLinkRemoteService.createLink(linkCreateReqDTO);
+    }
+
+    /**
+     * 批量创建短链接
+     */
+    @PostMapping("/api/short-link/v1/create/batch")
+    public Result<LinkBatchCreateRespDTO> batchCreateShortLink(@RequestBody LinkBatchCreateReqDTO linkBatchCreateReqDTO) {
+        return shortLinkRemoteService.batchCreateLink(linkBatchCreateReqDTO);
     }
 
     /**

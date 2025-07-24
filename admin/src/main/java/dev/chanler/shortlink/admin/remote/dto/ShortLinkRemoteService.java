@@ -168,4 +168,15 @@ public interface ShortLinkRemoteService {
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
+
+    /**
+     * 批量创建短链接
+     * @param linkBatchCreateReqDTO 短链接批量创建请求参数
+     * @return Result<LinkBatchCreateRespDTO>
+     */
+    default Result<LinkBatchCreateRespDTO> batchCreateLink(LinkBatchCreateReqDTO linkBatchCreateReqDTO) {
+        String resultBodyStr = HttpUtil.post("http://localhost:8001/api/short-link/v1/create/batch", JSON.toJSONString(linkBatchCreateReqDTO));
+        return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+        });
+    }
 }
