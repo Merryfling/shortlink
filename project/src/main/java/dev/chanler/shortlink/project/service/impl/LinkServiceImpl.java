@@ -176,6 +176,18 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             baseMapper.delete(updateWrapper);
             baseMapper.insert(linkDO);
         }
+        if (!Objects.equals(hasLinkDO.getValidDateType(), linkUpdateReqDTO.getValidDateType())
+                || !Objects.equals(hasLinkDO.getValidDate(), linkUpdateReqDTO.getValidDate())
+                || !Objects.equals(hasLinkDO.getOriginUrl(), linkUpdateReqDTO.getOriginUrl())) {
+            stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, linkUpdateReqDTO.getFullShortUrl()));
+            Date currentDate = new Date();
+            if (hasLinkDO.getValidDate() != null && hasLinkDO.getValidDate().before(currentDate)) {
+                if (Objects.equals(linkUpdateReqDTO.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType())
+                        || linkUpdateReqDTO.getValidDate().after(currentDate)) {
+                    stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, linkUpdateReqDTO.getFullShortUrl()));
+                }
+            }
+        }
     }
 
     @Override
