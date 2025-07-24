@@ -80,6 +80,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
+    private final LinkStatsTodayMapper linkStatsTodayMapper;
 
 
     @Override
@@ -402,6 +403,16 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                             .toString())
                     .build();
             linkAccessLogsMapper.insert(linkAccessLogsDO);
+
+            baseMapper.incrementStats(gid, fullShortUrl, 1, uvFirstFlag.get() ? 1 : 0, uipFirstFlag ? 1 : 0);
+            LinkStatsTodayDO linkStatsTodayDO = LinkStatsTodayDO.builder()
+                    .todayPv(1)
+                    .todayUv(uvFirstFlag.get() ? 1 : 0)
+                    .todayUip(uipFirstFlag ? 1 : 0)
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .build();
+            linkStatsTodayMapper.shortLinkTodayStats(linkStatsTodayDO);
         } catch (Exception e) {
             log.error("短链接访问统计失败，fullShortUrl: {}", fullShortUrl, e);
         }
