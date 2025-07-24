@@ -137,12 +137,34 @@ public interface ShortLinkRemoteService {
     }
 
     /**
+     * 获取分组短链接监控数据
+     * @param groupStatsReqDTO 获取分组短链接监控数据入参
+     * @return 短链接监控数据
+     */
+    default LinkStatsRespDTO groupShortLinkStats(GroupStatsReqDTO groupStatsReqDTO) {
+        String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/stats/group", BeanUtil.beanToMap(groupStatsReqDTO));
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
+
+    /**
      * 访问单个短链接指定时间内访问记录监控数据
      * @param linkStatsAccessRecordReqDTO 获取短链接监控访问记录数据入参
      * @return 访问记录监控数据
      */
     default IPage<LinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(LinkStatsAccessRecordReqDTO linkStatsAccessRecordReqDTO) {
         String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/stats/access-record", BeanUtil.beanToMap(linkStatsAccessRecordReqDTO));
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 访问分组短链接指定时间内访问记录监控数据
+     * @param groupStatsAccessRecordReqDTO 获取分组短链接监控访问记录数据入参
+     * @return 访问记录监控数据
+     */
+    default IPage<LinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(GroupStatsAccessRecordReqDTO groupStatsAccessRecordReqDTO) {
+        String resultStr = HttpUtil.get("http://localhost:8001/api/short-link/v1/stats/access-record/group", BeanUtil.beanToMap(groupStatsAccessRecordReqDTO));
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }

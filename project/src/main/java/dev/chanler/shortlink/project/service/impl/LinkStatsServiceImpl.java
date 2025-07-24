@@ -12,6 +12,7 @@ import dev.chanler.shortlink.project.common.biz.user.UserContext;
 import dev.chanler.shortlink.project.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.project.dao.entity.*;
 import dev.chanler.shortlink.project.dao.mapper.*;
+import dev.chanler.shortlink.project.dto.req.GroupStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.GroupStatsReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsReqDTO;
@@ -435,6 +436,36 @@ public class LinkStatsServiceImpl implements LinkStatsService {
                 .deviceStats(deviceStats)
                 .networkStats(networkStats)
                 .build();
+    }
+
+    @Override
+    public IPage<LinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(GroupStatsAccessRecordReqDTO groupStatsAccessRecordReqDTO) {
+        checkGroupBelongToUser(groupStatsAccessRecordReqDTO.getGid());
+        IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectGroupPage(groupStatsAccessRecordReqDTO);
+        if (CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
+            return new Page<>();
+        }
+        IPage<LinkStatsAccessRecordRespDTO> actualResult = linkAccessLogsDOIPage
+                .convert(each -> BeanUtil.toBean(each, LinkStatsAccessRecordRespDTO.class));
+        List<String> userAccessLogsList = actualResult.getRecords().stream()
+                .map(LinkStatsAccessRecordRespDTO::getUser)
+                .toList();
+        List<Map<String, Object>> uvTypeList = linkAccessLogsMapper.selectGroupUvTypeByUsers(
+                groupStatsAccessRecordReqDTO.getGid(),
+                groupStatsAccessRecordReqDTO.getStartDate(),
+                groupStatsAccessRecordReqDTO.getEndDate(),
+                userAccessLogsList
+        );
+        actualResult.getRecords().forEach(each -> {
+            String uvType = uvTypeList.stream()
+                    .filter(item -> Objects.equals(each.getUser(), item.get("user")))
+                    .findFirst()
+                    .map(item -> item.get("uvType"))
+                    .map(Object::toString)
+                    .orElse("旧访客");
+            each.setUvType(uvType);
+        });
+        return actualResult;
     }
 
     public void checkGroupBelongToUser(String gid) throws ServiceException {

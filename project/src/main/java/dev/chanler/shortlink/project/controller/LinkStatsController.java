@@ -3,6 +3,7 @@ package dev.chanler.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import dev.chanler.shortlink.project.common.convention.result.Result;
 import dev.chanler.shortlink.project.common.convention.result.Results;
+import dev.chanler.shortlink.project.dto.req.GroupStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.GroupStatsReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsAccessRecordReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkStatsReqDTO;
@@ -51,5 +52,15 @@ public class LinkStatsController {
     @GetMapping("/api/short-link/v1/stats/access-record")
     public Result<IPage<LinkStatsAccessRecordRespDTO>> shortLinkStatsAccessRecord(LinkStatsAccessRecordReqDTO linkStatsAccessRecordReqDTO) {
         return Results.success(linkStatsService.shortLinkStatsAccessRecord(linkStatsAccessRecordReqDTO));
+    }
+
+    /**
+     * 访问分组短链接指定时间内访问记录监控数据
+     * @param groupStatsAccessRecordReqDTO 获取分组短链接监控访问记录数据入参
+     * @return 访问记录监控数据
+     */
+    @GetMapping("/api/short-link/v1/stats/access-record/group")
+    public Result<IPage<LinkStatsAccessRecordRespDTO>> groupShortLinkStatsAccessRecord(GroupStatsAccessRecordReqDTO groupStatsAccessRecordReqDTO) {
+        return Results.success(linkStatsService.groupShortLinkStatsAccessRecord(groupStatsAccessRecordReqDTO));
     }
 }
