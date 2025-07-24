@@ -39,6 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -82,6 +83,8 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
 
+    @Value("${short-link.domain.default}")
+    private String createLinkDefaultDomain;
 
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
@@ -91,7 +94,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .append(shortLinkSuffix)
                 .toString();
         LinkDO linkDO = LinkDO.builder()
-                .domain(linkCreateReqDTO.getDomain())
+                .domain(createLinkDefaultDomain)
                 .originUrl(linkCreateReqDTO.getOriginUrl())
                 .gid(linkCreateReqDTO.getGid())
                 .createdType(linkCreateReqDTO.getCreatedType())
