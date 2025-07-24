@@ -178,12 +178,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
 
     @Override
     public IPage<LinkPageRespDTO> pageLink(LinkPageReqDTO linkPageReqDTO) {
-        LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
-                .eq(LinkDO::getDelFlag, 0)
-                .eq(LinkDO::getGid, linkPageReqDTO.getGid())
-                .eq(LinkDO::getEnableStatus, 0)
-                .orderByDesc(LinkDO::getCreateTime);
-        IPage<LinkDO> resultPage = baseMapper.selectPage(linkPageReqDTO, queryWrapper);
+        IPage<LinkDO> resultPage = baseMapper.pageLink(linkPageReqDTO);
         return resultPage.convert(each -> {
             LinkPageRespDTO bean = BeanUtil.toBean(each, LinkPageRespDTO.class);
             bean.setDomain("http://" + bean.getDomain());
