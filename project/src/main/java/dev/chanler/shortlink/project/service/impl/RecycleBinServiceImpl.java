@@ -85,9 +85,10 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
                 .eq(LinkDO::getGid, recycleBinRemoveReqDTO.getGid())
                 .eq(LinkDO::getEnableStatus, 1)
                 .eq(LinkDO::getDelFlag, 0);
-        LinkDO linkDO = LinkDO.builder()
-                .enableStatus(0)
+        LinkDO delLinkDO = LinkDO.builder()
+                .delTime(System.currentTimeMillis())
                 .build();
-        baseMapper.delete(linkDO, updateWrapper);
+        delLinkDO.setDelFlag(1);
+        baseMapper.update(delLinkDO, updateWrapper);
     }
 }
