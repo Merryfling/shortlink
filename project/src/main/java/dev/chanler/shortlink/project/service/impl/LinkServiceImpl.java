@@ -506,7 +506,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             String originUrl = linkCreateReqDTO.getOriginUrl();
             originUrl += System.currentTimeMillis();
             shortUri = HashUtil.hashToBase62(originUrl);
-            fullShortUrl = StrBuilder.create(linkCreateReqDTO.getDomain())
+            fullShortUrl = StrBuilder.create(createLinkDefaultDomain)
                     .append("/")
                     .append(shortUri)
                     .toString();
