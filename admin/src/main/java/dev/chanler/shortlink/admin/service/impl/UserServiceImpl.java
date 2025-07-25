@@ -1,13 +1,13 @@
 package dev.chanler.shortlink.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.UUID;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import dev.chanler.shortlink.admin.common.constant.RedisCacheConstant;
 import dev.chanler.shortlink.admin.common.convention.exception.ClientException;
 import dev.chanler.shortlink.admin.common.enums.UserErrorCodeEnum;
 import dev.chanler.shortlink.admin.dao.entity.UserDO;
@@ -28,7 +28,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static dev.chanler.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
+import static dev.chanler.shortlink.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
 
 /**
  * 用户接口实现层
@@ -66,7 +70,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (existsByUsername(userRegisterReqDTO.getUsername())) {
             throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
         }
-        RLock lock = redissonClient.getLock(RedisCacheConstant.LOCK_USER_REGISTER_KEY+ userRegisterReqDTO.getUsername());
+        RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY+ userRegisterReqDTO.getUsername());
         try {
             if (lock.tryLock()) {
                 try {
@@ -105,23 +109,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 .eq(UserDO::getDelFlag, 0);
         UserDO userDO = baseMapper.selectOne(queryWrapper);
         if (userDO == null) {
-            throw new ClientException("用户不存在或密码错误");
+            throw new ClientException("用户不存在");
         }
-        Boolean hasLogin = stringRedisTemplate.hasKey(userLoginReqDTO.getUsername());
-        if (hasLogin != null && hasLogin) {
-            //TODO: 挤掉其他登录，并重新登录或者允许多登录
-            throw new ClientException("用户已登录");
+        Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries(USER_LOGIN_KEY + userLoginReqDTO.getUsername());
+        if (CollUtil.isNotEmpty(hasLoginMap)) {
+            stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+            String token = hasLoginMap.keySet().stream()
+                    .findFirst()
+                    .map(Object::toString)
+                    .orElseThrow(() -> new ClientException("用户登录错误"));
+            return new UserLoginRespDTO(token);
         }
         /**
          * Hash
-         * Key: login_{username}
-         * Value:
-         *   Key: token
-         *   Value: UserDO JSON
+         * Key：login_用户名
+         * Value：
+         *  Key：token标识
+         *  Val：JSON 字符串（用户信息）
          */
         String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForHash().put("login_" + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
-        stringRedisTemplate.expire("login_" + userLoginReqDTO.getUsername(), 30L, TimeUnit.DAYS);
+        stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
+        stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
         return new UserLoginRespDTO(uuid);
     }
 
