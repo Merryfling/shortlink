@@ -16,3 +16,34 @@ spring:
     view:
       prefix: /templates/
       suffix: .html
+
+short-link:
+  domain:
+    default: chlr.cc
+  stats:
+    locale:
+      provider: local
+      local:
+        dbPath: classpath:ip2region.xdb
+      amap:
+        key:
+        endpoint: https://restapi.amap.com/v3/ip
+        timeout: 1000
+  goto-domain:
+    white-list:
+      enable: true
+      names: 'Chanler个人站,知乎,掘金,博客园,b站,GitHub,CSDN,微信,QQ,头条,微博,豆瓣,简书'
+      details:
+        - chanler.dev
+        - zhihu.com
+        - juejin.cn
+        - cnblogs.com
+        - bilibili.com
+        - github.com
+        - csdn.net
+        - weixin.qq.com
+        - qq.com
+        - toutiao.com
+        - weibo.com
+        - douban.com
+        - jianshu.com
