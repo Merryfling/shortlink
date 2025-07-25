@@ -2,12 +2,18 @@ package dev.chanler.shortlink.project.toolkit;
 
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.URLUtil;
+import com.google.common.net.InternetDomainName;
 import dev.chanler.shortlink.project.toolkit.ipgeo.GeoInfo;
 import dev.chanler.shortlink.project.toolkit.ipgeo.IpGeoClient;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
+import java.net.IDN;
+import java.net.URL;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Optional;
 
 import static dev.chanler.shortlink.project.common.constant.LinkConstant.DEFAULT_CACHE_VALID_TIME;
@@ -145,5 +151,30 @@ public class LinkUtil {
             return "Unknown";
         }
         return isp;
+    }
+
+    public static String extractDomain(String url) {
+        if (StrUtil.isBlank(url)) return null;
+        String u = url.trim();
+        if (!u.matches("^[a-zA-Z][a-zA-Z0-9+.-]*://.*$")) u = "http://" + u; // 补scheme
+
+        URL parsed = URLUtil.url(u);
+        String host = parsed.getHost();
+        if (StrUtil.isBlank(host)) return null;
+
+        host = host.toLowerCase(Locale.ROOT);
+        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
+        try { host = IDN.toASCII(host); } catch (Exception ignore) {}
+
+        // IP / localhost 直接忽略
+        if ("localhost".equals(host) || host.matches("^\\d+\\.\\d+\\.\\d+\\.\\d+$") || host.contains(":")) return null;
+
+        try {
+            InternetDomainName idn = InternetDomainName.from(host);
+            if (idn.isUnderPublicSuffix() || idn.isTopPrivateDomain()) {
+                return idn.topPrivateDomain().toString(); // eTLD+1
+            }
+        } catch (IllegalArgumentException ignore) {}
+        return null;
     }
 }

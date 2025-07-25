@@ -6,13 +6,13 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import dev.chanler.shortlink.project.common.config.GotoDomainWhiteListConfiguration;
 import dev.chanler.shortlink.project.common.convention.exception.ClientException;
 import dev.chanler.shortlink.project.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.project.common.enums.ValidDateTypeEnum;
@@ -37,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
+import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
@@ -81,18 +82,20 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
+    private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
 
     @Value("${short-link.domain.default}")
     private String createLinkDefaultDomain;
 
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
+        verificationWhitelist(linkCreateReqDTO.getOriginUrl());
         String shortLinkSuffix = generateSuffix(linkCreateReqDTO);
-        String fullShortUrl = StrBuilder.create(linkCreateReqDTO.getDomain())
+        String fullShortUrl = StrBuilder.create(createLinkDefaultDomain)
                 .append("/")
                 .append(shortLinkSuffix)
                 .toString();
-        LinkDO linkDO = LinkDO.builder()
+        LinkDO shortLinkDO = LinkDO.builder()
                 .domain(createLinkDefaultDomain)
                 .originUrl(linkCreateReqDTO.getOriginUrl())
                 .gid(linkCreateReqDTO.getGid())
@@ -102,6 +105,10 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .describe(linkCreateReqDTO.getDescribe())
                 .shortUri(shortLinkSuffix)
                 .enableStatus(0)
+                .totalPv(0)
+                .totalUv(0)
+                .totalUip(0)
+                .delTime(0L)
                 .fullShortUrl(fullShortUrl)
                 .favicon(getFavicon(linkCreateReqDTO.getOriginUrl()))
                 .build();
@@ -110,71 +117,105 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .gid(linkCreateReqDTO.getGid())
                 .build();
         try {
-            baseMapper.insert(linkDO);
+            baseMapper.insert(shortLinkDO);
             linkGotoMapper.insert(linkGotoDO);
         } catch (DuplicateKeyException ex) {
-            LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
-                    .eq(LinkDO::getFullShortUrl, fullShortUrl);
-            LinkDO existLinkDO = baseMapper.selectOne(queryWrapper);
-            if (existLinkDO != null) {
-                log.warn("短链接:{} 重复入库", fullShortUrl);
-                throw new ServiceException("短链接生成重复");
+            // 首先判断是否存在布隆过滤器，如果不存在直接新增
+            if (!shortUriCreateCachePenetrationBloomFilter.contains(fullShortUrl)) {
+                shortUriCreateCachePenetrationBloomFilter.add(fullShortUrl);
             }
+            throw new ServiceException(String.format("短链接：%s 生成重复", fullShortUrl));
         }
+        // 缓存预热
         stringRedisTemplate.opsForValue().set(
                 String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
                 linkCreateReqDTO.getOriginUrl(),
-                LinkUtil.getLinkCacheValidTime(linkCreateReqDTO.getValidDate()),
-                TimeUnit.MILLISECONDS
+                LinkUtil.getLinkCacheValidTime(linkCreateReqDTO.getValidDate()), TimeUnit.MILLISECONDS
         );
         shortUriCreateCachePenetrationBloomFilter.add(fullShortUrl);
         return LinkCreateRespDTO.builder()
-                .fullShortUrl("http://" + linkDO.getFullShortUrl())
-                .originUrl(linkDO.getOriginUrl())
-                .gid(linkDO.getGid())
+                .fullShortUrl("http://" + shortLinkDO.getFullShortUrl())
+                .originUrl(linkCreateReqDTO.getOriginUrl())
+                .gid(linkCreateReqDTO.getGid())
                 .build();
     }
 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void updateLink(LinkUpdateReqDTO linkUpdateReqDTO) {
-        Wrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
-                .eq(LinkDO::getGid, linkUpdateReqDTO.getGid())
+        verificationWhitelist(linkUpdateReqDTO.getOriginUrl());
+        LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
+                .eq(LinkDO::getGid, linkUpdateReqDTO.getOriginGid())
                 .eq(LinkDO::getFullShortUrl, linkUpdateReqDTO.getFullShortUrl())
                 .eq(LinkDO::getDelFlag, 0)
                 .eq(LinkDO::getEnableStatus, 0);
         LinkDO hasLinkDO = baseMapper.selectOne(queryWrapper);
         if (hasLinkDO == null) {
-            throw new ClientException("短链接不存在");
+            throw new ClientException("短链接记录不存在");
         }
-        LinkDO linkDO = LinkDO.builder()
-                .domain(hasLinkDO.getDomain())
-                .shortUri(hasLinkDO.getShortUri())
-                .clickNum(hasLinkDO.getClickNum())
-                .favicon(hasLinkDO.getFavicon())
-                .createdType(hasLinkDO.getCreatedType())
-                .gid(linkUpdateReqDTO.getGid())
-                .originUrl(linkUpdateReqDTO.getOriginUrl())
-                .describe(linkUpdateReqDTO.getDescribe())
-                .validDateType(linkUpdateReqDTO.getValidDateType())
-                .validDate(linkUpdateReqDTO.getValidDate())
-                .build();
         if (Objects.equals(hasLinkDO.getGid(), linkUpdateReqDTO.getGid())) {
             LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
-                    .eq(LinkDO::getDelFlag, 0)
-                    .eq(LinkDO::getEnableStatus, 0)
                     .eq(LinkDO::getFullShortUrl, linkUpdateReqDTO.getFullShortUrl())
                     .eq(LinkDO::getGid, linkUpdateReqDTO.getGid())
-                    .set(Objects.equals(linkUpdateReqDTO.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()), LinkDO::getValidDate, null);
-            baseMapper.update(linkDO, updateWrapper);
-        } else {
-            LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
                     .eq(LinkDO::getDelFlag, 0)
                     .eq(LinkDO::getEnableStatus, 0)
-                    .eq(LinkDO::getFullShortUrl, linkUpdateReqDTO.getFullShortUrl())
-                    .eq(LinkDO::getGid, hasLinkDO.getGid());
-            baseMapper.delete(updateWrapper);
-            baseMapper.insert(linkDO);
+                    .set(Objects.equals(linkUpdateReqDTO.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()), LinkDO::getValidDate, null);
+            LinkDO linkDO = LinkDO.builder()
+                    .domain(hasLinkDO.getDomain())
+                    .shortUri(hasLinkDO.getShortUri())
+                    .favicon(Objects.equals(linkUpdateReqDTO.getOriginUrl(), hasLinkDO.getOriginUrl()) ? hasLinkDO.getFavicon() : getFavicon(linkUpdateReqDTO.getOriginUrl()))
+                    .createdType(hasLinkDO.getCreatedType())
+                    .gid(linkUpdateReqDTO.getGid())
+                    .originUrl(linkUpdateReqDTO.getOriginUrl())
+                    .describe(linkUpdateReqDTO.getDescribe())
+                    .validDateType(linkUpdateReqDTO.getValidDateType())
+                    .validDate(linkUpdateReqDTO.getValidDate())
+                    .build();
+            baseMapper.update(linkDO, updateWrapper);
+        } else {
+            RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY, linkUpdateReqDTO.getFullShortUrl()));
+            RLock rLock = readWriteLock.writeLock();
+            rLock.lock();
+            try {
+                LambdaUpdateWrapper<LinkDO> linkUpdateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
+                        .eq(LinkDO::getFullShortUrl, linkUpdateReqDTO.getFullShortUrl())
+                        .eq(LinkDO::getGid, hasLinkDO.getGid())
+                        .eq(LinkDO::getDelFlag, 0)
+                        .eq(LinkDO::getDelTime, 0L)
+                        .eq(LinkDO::getEnableStatus, 0);
+                LinkDO delLinkDO = LinkDO.builder()
+                        .delTime(System.currentTimeMillis())
+                        .build();
+                delLinkDO.setDelFlag(1);
+                baseMapper.update(delLinkDO, linkUpdateWrapper);
+                LinkDO linkDO = LinkDO.builder()
+                        .domain(createLinkDefaultDomain)
+                        .originUrl(linkUpdateReqDTO.getOriginUrl())
+                        .gid(linkUpdateReqDTO.getGid())
+                        .createdType(hasLinkDO.getCreatedType())
+                        .validDateType(linkUpdateReqDTO.getValidDateType())
+                        .validDate(linkUpdateReqDTO.getValidDate())
+                        .describe(linkUpdateReqDTO.getDescribe())
+                        .shortUri(hasLinkDO.getShortUri())
+                        .enableStatus(hasLinkDO.getEnableStatus())
+                        .totalPv(hasLinkDO.getTotalPv())
+                        .totalUv(hasLinkDO.getTotalUv())
+                        .totalUip(hasLinkDO.getTotalUip())
+                        .fullShortUrl(hasLinkDO.getFullShortUrl())
+                        .favicon(Objects.equals(linkUpdateReqDTO.getOriginUrl(), hasLinkDO.getOriginUrl()) ? hasLinkDO.getFavicon() : getFavicon(linkUpdateReqDTO.getOriginUrl()))
+                        .delTime(0L)
+                        .build();
+                baseMapper.insert(linkDO);
+                LambdaQueryWrapper<LinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(LinkGotoDO.class)
+                        .eq(LinkGotoDO::getFullShortUrl, linkUpdateReqDTO.getFullShortUrl())
+                        .eq(LinkGotoDO::getGid, hasLinkDO.getGid());
+                LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
+                linkGotoMapper.delete(linkGotoQueryWrapper);
+                linkGotoDO.setGid(linkUpdateReqDTO.getGid());
+                linkGotoMapper.insert(linkGotoDO);
+            } finally {
+                rLock.unlock();
+            }
         }
         if (!Objects.equals(hasLinkDO.getValidDateType(), linkUpdateReqDTO.getValidDateType())
                 || !Objects.equals(hasLinkDO.getValidDate(), linkUpdateReqDTO.getValidDate())
@@ -182,8 +223,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             stringRedisTemplate.delete(String.format(GOTO_SHORT_LINK_KEY, linkUpdateReqDTO.getFullShortUrl()));
             Date currentDate = new Date();
             if (hasLinkDO.getValidDate() != null && hasLinkDO.getValidDate().before(currentDate)) {
-                if (Objects.equals(linkUpdateReqDTO.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType())
-                        || linkUpdateReqDTO.getValidDate().after(currentDate)) {
+                if (Objects.equals(linkUpdateReqDTO.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) || linkUpdateReqDTO.getValidDate().after(currentDate)) {
                     stringRedisTemplate.delete(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, linkUpdateReqDTO.getFullShortUrl()));
                 }
             }
@@ -203,12 +243,13 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     @Override
     public List<GroupLinkCountQueryRespDTO> listGroupLinkCount(List<String> gidList) {
         QueryWrapper<LinkDO> queryWrapper = Wrappers.query(new LinkDO())
-                .select("gid as gid, count(*) as linkCount")
+                .select("gid as gid, count(*) as shortLinkCount")
                 .in("gid", gidList)
                 .eq("enable_status", 0)
+                .eq("del_flag", 0)
                 .groupBy("gid");
-        List<Map<String, Object>> LinkDOList = baseMapper.selectMaps(queryWrapper);
-        return BeanUtil.copyToList(LinkDOList, GroupLinkCountQueryRespDTO.class);
+        List<Map<String, Object>> shortLinkDOList = baseMapper.selectMaps(queryWrapper);
+        return BeanUtil.copyToList(shortLinkDOList, GroupLinkCountQueryRespDTO.class);
     }
 
     @Override
@@ -558,5 +599,20 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
         } catch (Exception e) {
         }
         return null;
+    }
+
+    private void verificationWhitelist(String originUrl) {
+        Boolean enable = gotoDomainWhiteListConfiguration.getEnable();
+        if (enable == null || !enable) {
+            return;
+        }
+        String domain = LinkUtil.extractDomain(originUrl);
+        if (StrUtil.isBlank(domain)) {
+            throw new ClientException("跳转链接填写错误");
+        }
+        List<String> details = gotoDomainWhiteListConfiguration.getDetails();
+        if (!details.contains(domain)) {
+            throw new ClientException("演示环境为避免恶意攻击，请生成以下网站跳转链接：" + gotoDomainWhiteListConfiguration.getNames());
+        }
     }
 }
