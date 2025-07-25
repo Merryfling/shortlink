@@ -1,6 +1,5 @@
 package dev.chanler.shortlink.project.dto.req;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
@@ -24,6 +23,11 @@ public class LinkUpdateReqDTO {
     private String fullShortUrl;
 
     /**
+     * 原始分组标识
+     */
+    private String originGid;
+
+    /**
      * 分组标识
      */
     private String gid;
@@ -42,6 +46,5 @@ public class LinkUpdateReqDTO {
     /**
      * 描述
      */
-    @TableField("`describe`")
     private String describe;
 }
