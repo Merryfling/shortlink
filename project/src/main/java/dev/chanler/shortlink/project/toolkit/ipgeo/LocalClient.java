@@ -1,6 +1,8 @@
 package dev.chanler.shortlink.project.toolkit.ipgeo;
 
 import org.lionsoul.ip2region.xdb.Searcher;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.FileCopyUtils;
 
 /**
  * IP 地理位置查询本地客户端(ip2region xdb, 全内存模式)
@@ -15,8 +17,10 @@ public class LocalClient implements IpGeoClient {
 
     public LocalClient(String dbPath) {
         try {
-            byte[] cBuff = Searcher.loadContentFromFile(dbPath);
-            this.searcher = Searcher.newWithBuffer(cBuff); // 全内存，无 IO
+            // 文件放在 resources/ip2region.xdb
+            ClassPathResource resource = new ClassPathResource("ip2region.xdb");
+            byte[] buffer = FileCopyUtils.copyToByteArray(resource.getInputStream());
+            this.searcher = Searcher.newWithBuffer(buffer); // 全内存，无 IO
         } catch (Exception e) {
             throw new IllegalStateException("Init ip2region Searcher failed. dbPath=" + dbPath, e);
         }

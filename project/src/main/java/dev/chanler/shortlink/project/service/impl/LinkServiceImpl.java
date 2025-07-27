@@ -481,6 +481,9 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                     .build();
             linkAccessLogsMapper.insert(linkAccessLogsDO);
 
+            String gid = linkGotoMapper.selectOne(Wrappers.lambdaQuery(LinkGotoDO.class)
+                            .select(LinkGotoDO::getGid)
+                            .eq(LinkGotoDO::getFullShortUrl, fullShortUrl)).getGid();
             baseMapper.incrementStats(gid, fullShortUrl, 1, uvFirstFlag.get() ? 1 : 0, uipFirstFlag ? 1 : 0);
             LinkStatsTodayDO linkStatsTodayDO = LinkStatsTodayDO.builder()
                     .todayPv(1)

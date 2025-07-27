@@ -1,5 +1,5 @@
 server:
-  port: 8000
+  port: 8003
 
 spring:
   datasource:
@@ -11,7 +11,7 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: TheBestWorkLoanapp1
+      password: TheBestDevChanler
 
 short-link:
   group:
