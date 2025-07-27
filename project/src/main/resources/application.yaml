@@ -11,7 +11,7 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: TheBestWorkLoanapp1
+      password: TheBestDevChanler
   mvc:
     view:
       prefix: /templates/
@@ -19,12 +19,27 @@ spring:
 
 short-link:
   domain:
-    default: chlr.cc
+    default: 127.0.0.1
+    # default: go.chanler.dev
+  rate-limit:
+    create:
+      enable: true
+      rps: 500
+      # 毫秒
+      timeout: 20
+    redirect:
+      enable: true
+      rps: 1000
+      timeout: 5
+    stats:
+      enable: true
+      rps: 100
+      timeout: 50
   stats:
     locale:
       provider: local
       local:
-        dbPath: classpath:ip2region.xdb
+        dbPath: ip2region.xdb
       amap:
         key:
         endpoint: https://restapi.amap.com/v3/ip
