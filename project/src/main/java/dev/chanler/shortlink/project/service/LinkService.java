@@ -3,6 +3,7 @@ package dev.chanler.shortlink.project.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import dev.chanler.shortlink.project.dao.entity.LinkDO;
+import dev.chanler.shortlink.project.dto.biz.LinkStatsRecordDTO;
 import dev.chanler.shortlink.project.dto.req.LinkBatchCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
@@ -64,4 +65,9 @@ public interface LinkService extends IService<LinkDO> {
      */
     LinkBatchCreateRespDTO batchCreateLink(LinkBatchCreateReqDTO linkBatchCreateReqDTO);
 
+    /**
+     * 短链接统计
+     * @param linkStatsRecordDTO 短链接统计实体参数
+     */
+    void linkStats(LinkStatsRecordDTO linkStatsRecordDTO);
 }

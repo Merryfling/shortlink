@@ -6,6 +6,7 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.text.StrBuilder;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -18,11 +19,13 @@ import dev.chanler.shortlink.project.common.convention.exception.ServiceExceptio
 import dev.chanler.shortlink.project.common.enums.ValidDateTypeEnum;
 import dev.chanler.shortlink.project.dao.entity.*;
 import dev.chanler.shortlink.project.dao.mapper.*;
+import dev.chanler.shortlink.project.dto.biz.LinkStatsRecordDTO;
 import dev.chanler.shortlink.project.dto.req.LinkBatchCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkCreateReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkPageReqDTO;
 import dev.chanler.shortlink.project.dto.req.LinkUpdateReqDTO;
 import dev.chanler.shortlink.project.dto.resp.*;
+import dev.chanler.shortlink.project.mq.producer.LinkStatsSaveProducer;
 import dev.chanler.shortlink.project.service.LinkService;
 import dev.chanler.shortlink.project.toolkit.HashUtil;
 import dev.chanler.shortlink.project.toolkit.LinkUtil;
@@ -34,6 +37,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
@@ -45,7 +49,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -83,10 +86,12 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
+    private final LinkStatsSaveProducer linkStatsSaveProducer;
 
     @Value("${short-link.domain.default}")
     private String createLinkDefaultDomain;
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
         verificationWhitelist(linkCreateReqDTO.getOriginUrl());
@@ -252,96 +257,76 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
         return BeanUtil.copyToList(shortLinkDOList, GroupLinkCountQueryRespDTO.class);
     }
 
+    @SneakyThrows
     @Override
     public void restoreUrl(String shortUri, ServletRequest request, ServletResponse response) {
         String serverName = request.getServerName();
-        String fullShortUrl = StrBuilder.create(serverName).append("/").append(shortUri).toString();
-        String originUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_SHORT_LINK_KEY), fullShortUrl));
-        if (StrUtil.isNotBlank(originUrl)) {
-            try {
-                linkStats(fullShortUrl, request, response);
-                ((HttpServletResponse) response).sendRedirect(originUrl);
-            } catch (IOException e) {
-                throw new ServiceException("重定向失败");
-            }
+        String serverPort = Optional.of(request.getServerPort())
+                .filter(each -> !Objects.equals(each, 80))
+                .map(String::valueOf)
+                .map(each -> ":" + each)
+                .orElse("");
+        String fullShortUrl = StrBuilder.create(serverName)
+                .append(serverPort)
+                .append("/")
+                .append(shortUri)
+                .toString();
+        String originalLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
+        if (StrUtil.isNotBlank(originalLink)) {
+            linkStats(buildLinkStatsRecordAndSetUser(fullShortUrl, request, response));
+            ((HttpServletResponse) response).sendRedirect(originalLink);
             return;
         }
         boolean contains = shortUriCreateCachePenetrationBloomFilter.contains(fullShortUrl);
         if (!contains) {
-            try {
-                ((HttpServletResponse) response).sendRedirect("/page/notfound");
-            } catch (IOException e) {
-                throw new ServiceException("重定向失败");
-            }
+            ((HttpServletResponse) response).sendRedirect("/page/notfound");
             return;
         }
-        String gotoIsNullShortUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl));
-        if (StrUtil.isNotBlank(gotoIsNullShortUrl)) {
-            try {
-                ((HttpServletResponse) response).sendRedirect("/page/notfound");
-            } catch (IOException e) {
-                throw new ServiceException("重定向失败");
-            }
+        String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+        if (StrUtil.isNotBlank(gotoIsNullShortLink)) {
+            ((HttpServletResponse) response).sendRedirect("/page/notfound");
             return;
         }
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
-            originUrl = stringRedisTemplate.opsForValue().get(String.format((GOTO_SHORT_LINK_KEY), fullShortUrl));
-            if (StrUtil.isNotBlank(originUrl)) {
-                try {
-                    linkStats(fullShortUrl, request, response);
-                    ((HttpServletResponse) response).sendRedirect(originUrl);
-                } catch (IOException e) {
-                    throw new ServiceException("重定向失败");
-                }
+            originalLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
+            if (StrUtil.isNotBlank(originalLink)) {
+                linkStats(buildLinkStatsRecordAndSetUser(fullShortUrl, request, response));
+                ((HttpServletResponse) response).sendRedirect(originalLink);
+                return;
+            }
+            gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+            if (StrUtil.isNotBlank(gotoIsNullShortLink)) {
+                ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
             LambdaQueryWrapper<LinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(LinkGotoDO.class)
                     .eq(LinkGotoDO::getFullShortUrl, fullShortUrl);
             LinkGotoDO linkGotoDO = linkGotoMapper.selectOne(linkGotoQueryWrapper);
             if (linkGotoDO == null) {
-                stringRedisTemplate.opsForValue().set(
-                        String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
-                        "-", 30, TimeUnit.MINUTES
-                );
-                try {
-                    ((HttpServletResponse) response).sendRedirect("/page/notfound");
-                } catch (IOException e) {
-                    throw new ServiceException("重定向失败");
-                }
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-", 30, TimeUnit.MINUTES);
+                ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
             LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
-                    .eq(LinkDO::getFullShortUrl, linkGotoDO.getFullShortUrl())
                     .eq(LinkDO::getGid, linkGotoDO.getGid())
+                    .eq(LinkDO::getFullShortUrl, fullShortUrl)
                     .eq(LinkDO::getDelFlag, 0)
                     .eq(LinkDO::getEnableStatus, 0);
             LinkDO linkDO = baseMapper.selectOne(queryWrapper);
             if (linkDO == null || (linkDO.getValidDate() != null && linkDO.getValidDate().before(new Date()))) {
-                stringRedisTemplate.opsForValue().set(
-                        String.format((GOTO_IS_NULL_SHORT_LINK_KEY), fullShortUrl),
-                        "-", 30, TimeUnit.MINUTES
-                );
-                try {
-                    ((HttpServletResponse) response).sendRedirect("/page/notfound");
-                } catch (IOException e) {
-                    throw new ServiceException("重定向失败");
-                }
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-", 30, TimeUnit.MINUTES);
+                ((HttpServletResponse) response).sendRedirect("/page/notfound");
                 return;
             }
             stringRedisTemplate.opsForValue().set(
                     String.format(GOTO_SHORT_LINK_KEY, fullShortUrl),
                     linkDO.getOriginUrl(),
-                    LinkUtil.getLinkCacheValidTime(linkDO.getValidDate()),
-                    TimeUnit.MILLISECONDS
+                    LinkUtil.getLinkCacheValidTime(linkDO.getValidDate()), TimeUnit.MILLISECONDS
             );
-            try {
-                linkStats(fullShortUrl, request, response);
-                ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
-            } catch (IOException e) {
-                throw new ServiceException("重定向失败");
-            }
+            linkStats(buildLinkStatsRecordAndSetUser(fullShortUrl, request, response));
+            ((HttpServletResponse) response).sendRedirect(linkDO.getOriginUrl());
         } finally {
             lock.unlock();
         }
@@ -374,7 +359,59 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
                 .build();
     }
 
-    private void linkStats(String fullShortUrl, ServletRequest request, ServletResponse response) {
+    private LinkStatsRecordDTO buildLinkStatsRecordAndSetUser(String fullShortUrl, ServletRequest request, ServletResponse response) {
+        AtomicBoolean uvFirstFlag = new AtomicBoolean();
+        Cookie[] cookies = ((HttpServletRequest) request).getCookies();
+        AtomicReference<String> uv = new AtomicReference<>();
+        Runnable addResponseCookieTask = () -> {
+            uv.set(UUID.fastUUID().toString());
+            Cookie uvCookie = new Cookie("uv", uv.get());
+            uvCookie.setMaxAge(60 * 60 * 24 * 30);
+            uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+            ((HttpServletResponse) response).addCookie(uvCookie);
+            uvFirstFlag.set(Boolean.TRUE);
+            stringRedisTemplate.opsForSet().add(String.format(SHORT_LINK_STATS_UV_KEY, fullShortUrl), uv.get());
+        };
+        if (ArrayUtil.isNotEmpty(cookies)) {
+            Arrays.stream(cookies)
+                    .filter(each -> Objects.equals(each.getName(), "uv"))
+                    .findFirst()
+                    .map(Cookie::getValue)
+                    .ifPresentOrElse(each -> {
+                        uv.set(each);
+                        Long uvAdded = stringRedisTemplate.opsForSet().add(String.format(SHORT_LINK_STATS_UV_KEY, fullShortUrl), each);
+                        uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
+                    }, addResponseCookieTask);
+        } else {
+            addResponseCookieTask.run();
+        }
+        String uip = LinkUtil.getActualIp(((HttpServletRequest) request));
+        String os = LinkUtil.getOs(((HttpServletRequest) request));
+        String browser = LinkUtil.getBrowser(((HttpServletRequest) request));
+        String device = LinkUtil.getDevice(((HttpServletRequest) request));
+        Long uipAdded = stringRedisTemplate.opsForSet().add(String.format(SHORT_LINK_STATS_UIP_KEY, fullShortUrl), uip);
+        boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
+        return LinkStatsRecordDTO.builder()
+                .fullShortUrl(fullShortUrl)
+                .uv(uv.get())
+                .uvFirstFlag(uvFirstFlag.get())
+                .uipFirstFlag(uipFirstFlag)
+                .uip(uip)
+                .os(os)
+                .browser(browser)
+                .device(device)
+                .currentDate(new Date())
+                .build();
+    }
+
+    @Override
+    public void linkStats(LinkStatsRecordDTO linkStatsRecordDTO) {
+        Map<String, String> producerMap = new HashMap<>();
+        producerMap.put("statsRecord", JSON.toJSONString(linkStatsRecordDTO));
+        linkStatsSaveProducer.send(producerMap);
+    }
+
+    private void oldLinkStats(String fullShortUrl, ServletRequest request, ServletResponse response) {
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
         Cookie[] cookies = ((HttpServletRequest) request).getCookies();
         try {

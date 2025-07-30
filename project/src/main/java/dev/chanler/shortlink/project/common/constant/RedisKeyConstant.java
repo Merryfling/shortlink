@@ -43,6 +43,12 @@ public class RedisKeyConstant {
     public static final String SHORT_LINK_STATS_UIP_KEY = "short-link:stats:uip:%s";
 
     /**
+     * 短链接幂等操作锁前缀 key
+     * 格式：short-link:idempotent:{messageId}
+     */
+    public static final String IDEMPOTENT_KEY_PREFIX = "short-link:idempotent:%s";
+
+    /**
      * 短链接监控消息保存队列 Topic 缓存标识
      */
     public static final String SHORT_LINK_STATS_STREAM_TOPIC_KEY = "short-link:stats-stream";
