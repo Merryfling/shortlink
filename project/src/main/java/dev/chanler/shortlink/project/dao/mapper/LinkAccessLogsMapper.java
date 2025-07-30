@@ -46,15 +46,16 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      */
     @Select("""
             SELECT
-                COUNT(tlal.user)              AS pv,
-                COUNT(DISTINCT tlal.user)     AS uv,
-                COUNT(DISTINCT tlal.ip)       AS uip
+                COUNT(tls.user) AS pv
+                COUNT(DISTINCT tls.user) AS uv
+                COUNT(DISTINCT tls.ip) AS uip
             FROM t_link tl
-            INNER JOIN t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url
+            INNER JOIN t_link_access_logs tls
+                ON tl.full_short_url = tls.full_short_url
             WHERE tl.gid = #{param.gid}
-              AND tl.del_flag = '0'
-              AND tl.enable_status = '0'
-              AND tlal.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+                AND tl.del_flag = '0'
+                AND tl.enable_status = '0'
+                AND tls.create_time BETWEEN #{param.startDate} AND #{param.endDate}
             GROUP BY tl.gid
             """)
     LinkAccessStatsDO findPvUvUidStatsByGroup(@Param("param") GroupStatsReqDTO groupStatsReqDTO);
@@ -64,23 +65,24 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      * @param linkStatsReqDTO 统计请求参数
      * @return 高频访问IP列表
      */
-    @Select("SELECT " +
-            "    tlal.ip, " +
-            "    COUNT(tlal.ip) AS count " +
-            "FROM " +
-            "    t_link tl INNER JOIN " +
-            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
-            "WHERE " +
-            "    tlal.full_short_url = #{param.fullShortUrl} " +
-            "    AND tl.gid = #{param.gid} " +
-            "    AND tl.del_flag = '0' " +
-            "    AND tl.enable_status = #{param.enableStatus} " +
-            "    AND tlal.create_time BETWEEN #{param.startDate} and #{param.endDate} " +
-            "GROUP BY " +
-            "    tlal.full_short_url, tl.gid, tlal.ip " +
-            "ORDER BY " +
-            "    count DESC " +
-            "LIMIT 5;")
+    @Select("""
+            SELECT
+                tls.ip
+                COUNT(tls.ip) AS count
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tls
+                ON tl.full_short_url = tls.full_short_url
+            WHERE tls.full_short_url = #{param.fullShortUrl}
+                AND tl.gid = #{param.gid}
+                AND tl.del_flag = '0'
+                AND tl.enable_status = #{param.enableStatus}
+                AND tls.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY tls.full_short_url
+                , tl.gid
+                , tls.ip
+            ORDER BY count DESC
+            LIMIT 5
+            """)
     List<HashMap<String, Object>> listTopIpByShortLink(@Param("param") LinkStatsReqDTO linkStatsReqDTO);
 
     /**
@@ -90,22 +92,18 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      */
     @Select("""
             SELECT
-                tlal.ip
-                COUNT(tlal.ip) AS count
-            FROM
-                t_link tl
-            INNER JOIN t_link_access_logs tlal
-                ON tl.full_short_url = tlal.full_short_url
-            WHERE
-                tl.gid = #{param.gid}
+                tls.ip
+                COUNT(tls.ip) AS count
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tls
+                ON tl.full_short_url = tls.full_short_url
+            WHERE tl.gid = #{param.gid}
                 AND tl.del_flag = '0'
                 AND tl.enable_status = '0'
-                AND tlal.create_time BETWEEN #{param.startDate} AND #{param.endDate}
-            GROUP BY
-                tl.gid
-                tlal.ip
-            ORDER BY
-                count DESC
+                AND tls.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+            GROUP BY tl.gid
+                , tls.ip
+            ORDER BY count DESC
             LIMIT 5
             """)
     List<HashMap<String, Object>> listTopIpByGroup(@Param("param") GroupStatsReqDTO groupStatsReqDTO);
@@ -115,24 +113,27 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      * @param linkStatsReqDTO 统计请求参数
      * @return 新旧访客统计数据
      */
-    @Select("SELECT " +
-            "    SUM(old_user) AS oldUserCnt, " +
-            "    SUM(new_user) AS newUserCnt " +
-            "FROM ( " +
-            "    SELECT " +
-            "        CASE WHEN COUNT(DISTINCT DATE(tlal.create_time)) > 1 THEN 1 ELSE 0 END AS old_user, " +
-            "        CASE WHEN COUNT(DISTINCT DATE(tlal.create_time)) = 1 AND MAX(tlal.create_time) >= #{param.startDate} AND MAX(tlal.create_time) <= #{param.endDate} THEN 1 ELSE 0 END AS new_user " +
-            "    FROM " +
-            "        t_link tl INNER JOIN " +
-            "        t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
-            "    WHERE " +
-            "        tlal.full_short_url = #{param.fullShortUrl} " +
-            "        AND tl.gid = #{param.gid} " +
-            "        AND tl.enable_status = #{param.enableStatus} " +
-            "        AND tl.del_flag = '0' " +
-            "    GROUP BY " +
-            "        tlal.user " +
-            ") AS user_counts;")
+    @Select("""
+            SELECT
+                SUM(old_user) AS oldUserCnt
+                SUM(new_user) AS newUserCnt
+            FROM (
+                SELECT
+                    CASE WHEN COUNT(DISTINCT DATE(tls.create_time)) > 1 THEN 1 ELSE 0 END AS old_user
+                    CASE WHEN COUNT(DISTINCT DATE(tls.create_time)) = 1
+                        AND MAX(tls.create_time) >= #{param.startDate}
+                        AND MAX(tls.create_time) <= #{param.endDate}
+                        THEN 1 ELSE 0 END AS new_user
+                FROM t_link tl
+                INNER JOIN t_link_access_logs tls
+                    ON tl.full_short_url = tls.full_short_url
+                WHERE tls.full_short_url = #{param.fullShortUrl}
+                    AND tl.gid = #{param.gid}
+                    AND tl.enable_status = #{param.enableStatus}
+                    AND tl.del_flag = '0'
+                GROUP BY tls.user
+            ) AS user_counts
+            """)
     HashMap<String, Object> findUvTypeCntByShortLink(@Param("param") LinkStatsReqDTO linkStatsReqDTO);
 
     /**
@@ -145,28 +146,28 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      * @param userAccessLogsList 用户列表
      * @return 用户新旧访客类型列表
      */
-    @Select("<script> " +
-            "SELECT " +
-            "    tlal.user, " +
-            "    CASE " +
-            "        WHEN MIN(tlal.create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客' " +
-            "        ELSE '老访客' " +
-            "    END AS uvType " +
-            "FROM " +
-            "    t_link tl INNER JOIN " +
-            "    t_link_access_logs tlal ON tl.full_short_url = tlal.full_short_url " +
-            "WHERE " +
-            "    tlal.full_short_url = #{fullShortUrl} " +
-            "    AND tl.gid = #{gid} " +
-            "    AND tl.del_flag = '0' " +
-            "    AND tl.enable_status = #{enableStatus} " +
-            "    AND tlal.user IN " +
-            "    <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'> " +
-            "        #{item} " +
-            "    </foreach> " +
-            "GROUP BY " +
-            "    tlal.user;" +
-            "</script>")
+    @Select("""
+            <script>
+            SELECT
+                tls.user
+                CASE
+                    WHEN MIN(tls.create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客'
+                    ELSE '老访客'
+                END AS uvType
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tls
+                ON tl.full_short_url = tls.full_short_url
+            WHERE tls.full_short_url = #{fullShortUrl}
+                AND tl.gid = #{gid}
+                AND tl.del_flag = '0'
+                AND tl.enable_status = #{enableStatus}
+                AND tls.user IN
+                <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'>
+                    #{item}
+                </foreach>
+            GROUP BY tls.user
+            </script>
+            """)
     List<Map<String, Object>> selectUvTypeByUsers(
             @Param("gid") String gid,
             @Param("fullShortUrl") String fullShortUrl,
@@ -183,18 +184,15 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      */
     @Select("""
             SELECT
-                tlal.*
-            FROM
-                t_link tl
-                INNER JOIN t_link_access_logs tlal
-                    ON tl.full_short_url = tlal.full_short_url
-            WHERE
-                tl.gid = #{param.gid}
+                tls.*
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tls
+                ON tl.full_short_url = tls.full_short_url
+            WHERE tl.gid = #{param.gid}
                 AND tl.del_flag = '0'
                 AND tl.enable_status = '0'
-                AND tlal.create_time BETWEEN #{param.startDate} AND #{param.endDate}
-            ORDER BY
-                tlal.create_time DESC
+                AND tls.create_time BETWEEN #{param.startDate} AND #{param.endDate}
+            ORDER BY tls.create_time DESC
             """)
     IPage<LinkAccessLogsDO> selectGroupPage(@Param("param") GroupStatsAccessRecordReqDTO groupStatsAccessRecordReqDTO);
 
@@ -208,26 +206,23 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
      */
     @Select("""
             <script>
-                SELECT
-                    tlal.user,
-                    CASE
-                        WHEN MIN(tlal.create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客'
-                        ELSE '老访客'
-                    END AS uvType
-                FROM
-                    t_link tl
-                    INNER JOIN t_link_access_logs tlal
-                        ON tl.full_short_url = tlal.full_short_url
-                WHERE
-                    tl.gid = #{gid}
-                    AND tl.del_flag = '0'
-                    AND tl.enable_status = '0'
-                    AND tlal.user IN
-                    <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'>
-                        #{item}
-                    </foreach>
-                GROUP BY
-                    tlal.user
+            SELECT
+                tls.user
+                CASE
+                    WHEN MIN(tls.create_time) BETWEEN #{startDate} AND #{endDate} THEN '新访客'
+                    ELSE '老访客'
+                END AS uvType
+            FROM t_link tl
+            INNER JOIN t_link_access_logs tls
+                ON tl.full_short_url = tls.full_short_url
+            WHERE tl.gid = #{gid}
+                AND tl.del_flag = '0'
+                AND tl.enable_status = '0'
+                AND tls.user IN
+                <foreach item='item' index='index' collection='userAccessLogsList' open='(' separator=',' close=')'>
+                    #{item}
+                </foreach>
+            GROUP BY tls.user
             </script>
             """)
     List<Map<String, Object>> selectGroupUvTypeByUsers(

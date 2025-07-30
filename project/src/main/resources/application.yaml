@@ -19,7 +19,7 @@ spring:
 
 short-link:
   domain:
-    default: 127.0.0.1
+    default: 127.0.0.1:8001
     # default: go.chanler.dev
   rate-limit:
     create:
