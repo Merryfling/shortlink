@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import dev.chanler.shortlink.common.biz.user.UserContext;
 import dev.chanler.shortlink.common.config.GotoDomainWhiteListConfiguration;
 import dev.chanler.shortlink.common.biz.user.GroupOwnershipVerifier;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
@@ -63,6 +64,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.*;
+import static dev.chanler.shortlink.common.constant.UserConstant.PUBLIC_GID;
+import static dev.chanler.shortlink.common.constant.UserConstant.PUBLIC_USERNAME;
 
 /**
  * 短链接接口实现层
@@ -96,8 +99,14 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
-        // 鉴权：校验分组归属
-        groupOwnershipService.assertOwnedByCurrentUser(linkCreateReqDTO.getGid());
+        // 未登录（public）创建：强制使用公共分组
+        String currentUsername = UserContext.getUsername();
+        if (java.util.Objects.equals(currentUsername, PUBLIC_USERNAME)) {
+            linkCreateReqDTO.setGid(PUBLIC_GID);
+        } else {
+            // 鉴权：校验分组归属
+            groupOwnershipService.assertOwnedByCurrentUser(linkCreateReqDTO.getGid());
+        }
         verificationWhitelist(linkCreateReqDTO.getOriginUrl());
         String shortLinkSuffix = generateSuffix(linkCreateReqDTO);
         String fullShortUrl = StrBuilder.create(createLinkDefaultDomain)
