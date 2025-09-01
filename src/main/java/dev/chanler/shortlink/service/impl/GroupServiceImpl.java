@@ -25,6 +25,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.List;
 import java.util.Objects;
@@ -43,6 +44,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     private final LinkService linkService;
     private final RedissonClient redissonClient;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${short-link.group.max-num}")
     private Integer groupMaxNum;
@@ -75,6 +77,12 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                     .name(groupName)
                     .build();
             baseMapper.insert(groupDO);
+            // 维护正向索引集合：user_gids
+            try {
+                String key = String.format(dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY, username);
+                stringRedisTemplate.opsForSet().add(key, gid);
+                stringRedisTemplate.expire(key, 30L, java.util.concurrent.TimeUnit.MINUTES);
+            } catch (Exception ignore) {}
         } finally {
             lock.unlock();
         }
@@ -112,6 +120,10 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         GroupDO groupDO = new GroupDO();
         groupDO.setDelFlag(1);
         baseMapper.update(groupDO, updateWrapper);
+        try {
+            String key = String.format(dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY, UserContext.getUsername());
+            stringRedisTemplate.opsForSet().remove(key, gid);
+        } catch (Exception ignore) {}
     }
 
     @Override

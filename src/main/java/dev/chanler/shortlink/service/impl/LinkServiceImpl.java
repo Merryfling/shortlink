@@ -14,6 +14,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.common.config.GotoDomainWhiteListConfiguration;
+import dev.chanler.shortlink.common.biz.user.GroupOwnershipVerifier;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
 import dev.chanler.shortlink.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.common.enums.ValidDateTypeEnum;
@@ -87,6 +88,7 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     private final LinkStatsTodayMapper linkStatsTodayMapper;
     private final GotoDomainWhiteListConfiguration gotoDomainWhiteListConfiguration;
     private final LinkStatsSaveProducer linkStatsSaveProducer;
+    private final GroupOwnershipVerifier groupOwnershipService;
 
     @Value("${short-link.domain.default}")
     private String createLinkDefaultDomain;
@@ -94,6 +96,8 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public LinkCreateRespDTO createLink(LinkCreateReqDTO linkCreateReqDTO) {
+        // 鉴权：校验分组归属
+        groupOwnershipService.assertOwnedByCurrentUser(linkCreateReqDTO.getGid());
         verificationWhitelist(linkCreateReqDTO.getOriginUrl());
         String shortLinkSuffix = generateSuffix(linkCreateReqDTO);
         String fullShortUrl = StrBuilder.create(createLinkDefaultDomain)
@@ -148,6 +152,8 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void updateLink(LinkUpdateReqDTO linkUpdateReqDTO) {
+        // 鉴权：校验新的分组归属
+        groupOwnershipService.assertOwnedByCurrentUser(linkUpdateReqDTO.getGid());
         verificationWhitelist(linkUpdateReqDTO.getOriginUrl());
         LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
                 .eq(LinkDO::getGid, linkUpdateReqDTO.getOriginGid())
@@ -237,6 +243,8 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
 
     @Override
     public IPage<LinkPageRespDTO> pageLink(LinkPageReqDTO linkPageReqDTO) {
+        // 鉴权：校验分组归属
+        groupOwnershipService.assertOwnedByCurrentUser(linkPageReqDTO.getGid());
         IPage<LinkDO> resultPage = baseMapper.pageLink(linkPageReqDTO);
         return resultPage.convert(each -> {
             LinkPageRespDTO bean = BeanUtil.toBean(each, LinkPageRespDTO.class);
@@ -247,6 +255,8 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
 
     @Override
     public List<GroupLinkCountQueryRespDTO> listGroupLinkCount(List<String> gidList) {
+        // 鉴权：校验分组列表归属
+        groupOwnershipService.assertAllOwnedByCurrentUser(gidList);
         QueryWrapper<LinkDO> queryWrapper = Wrappers.query(new LinkDO())
                 .select("gid as gid, count(*) as shortLinkCount")
                 .in("gid", gidList)

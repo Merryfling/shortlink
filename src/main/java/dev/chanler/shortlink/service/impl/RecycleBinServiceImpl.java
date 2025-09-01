@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.dao.entity.LinkDO;
+import dev.chanler.shortlink.common.biz.user.GroupOwnershipVerifier;
 import dev.chanler.shortlink.dao.mapper.LinkMapper;
 import dev.chanler.shortlink.dto.req.RecycleBinLinkPageReqDTO;
 import dev.chanler.shortlink.dto.req.RecycleBinRemoveReqDTO;
@@ -30,9 +31,11 @@ import static dev.chanler.shortlink.common.constant.RedisKeyConstant.GOTO_SHORT_
 public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements RecycleBinService {
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final GroupOwnershipVerifier groupOwnershipService;
 
     @Override
     public void saveRecycledBin(RecycleBinSaveReqDTO recycleBinSaveReqDTO) {
+        groupOwnershipService.assertOwnedByCurrentUser(recycleBinSaveReqDTO.getGid());
         LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
                 .eq(LinkDO::getFullShortUrl, recycleBinSaveReqDTO.getFullShortUrl())
                 .eq(LinkDO::getGid, recycleBinSaveReqDTO.getGid())
@@ -49,6 +52,7 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
 
     @Override
     public IPage<LinkPageRespDTO> pageRecycleBinLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
+        groupOwnershipService.assertAllOwnedByCurrentUser(recycleBinLinkPageReqDTO.getGidList());
         LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)
                 .eq(LinkDO::getDelFlag, 0)
                 .in(LinkDO::getGid, recycleBinLinkPageReqDTO.getGidList())
@@ -64,6 +68,7 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
 
     @Override
     public void restoreLink(RecycleBinRestoreReqDTO recycleBinRestoreReqDTO) {
+        groupOwnershipService.assertOwnedByCurrentUser(recycleBinRestoreReqDTO.getGid());
         LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
                 .eq(LinkDO::getFullShortUrl, recycleBinRestoreReqDTO.getFullShortUrl())
                 .eq(LinkDO::getGid, recycleBinRestoreReqDTO.getGid())
@@ -80,6 +85,7 @@ public class RecycleBinServiceImpl extends ServiceImpl<LinkMapper, LinkDO> imple
 
     @Override
     public void removeLink(RecycleBinRemoveReqDTO recycleBinRemoveReqDTO) {
+        groupOwnershipService.assertOwnedByCurrentUser(recycleBinRemoveReqDTO.getGid());
         LambdaUpdateWrapper<LinkDO> updateWrapper = Wrappers.lambdaUpdate(LinkDO.class)
                 .eq(LinkDO::getFullShortUrl, recycleBinRemoveReqDTO.getFullShortUrl())
                 .eq(LinkDO::getGid, recycleBinRemoveReqDTO.getGid())

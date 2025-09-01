@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import dev.chanler.shortlink.common.biz.user.UserContext;
+import dev.chanler.shortlink.common.biz.user.GroupOwnershipVerifier;
 import dev.chanler.shortlink.common.convention.exception.ServiceException;
 import dev.chanler.shortlink.dao.entity.*;
 import dev.chanler.shortlink.dao.mapper.*;
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class LinkStatsServiceImpl implements LinkStatsService {
 
     private final GroupMapper groupMapper;
+    private final GroupOwnershipVerifier groupOwnershipService;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final LinkAccessLogsMapper linkAccessLogsMapper;
@@ -43,7 +45,7 @@ public class LinkStatsServiceImpl implements LinkStatsService {
 
     @Override
     public LinkStatsRespDTO oneShortLinkStats(LinkStatsReqDTO linkStatsReqDTO) {
-        checkGroupBelongToUser(linkStatsReqDTO.getGid());
+        groupOwnershipService.assertOwnedByCurrentUser(linkStatsReqDTO.getGid());
         List<LinkAccessStatsDO> listStatsByShortLink = linkAccessStatsMapper.listStatsByShortLink(linkStatsReqDTO);
         if (CollUtil.isEmpty(listStatsByShortLink)) {
             return null;
@@ -240,7 +242,7 @@ public class LinkStatsServiceImpl implements LinkStatsService {
 
     @Override
     public IPage<LinkStatsAccessRecordRespDTO> shortLinkStatsAccessRecord(LinkStatsAccessRecordReqDTO linkStatsAccessRecordReqDTO) {
-        checkGroupBelongToUser(linkStatsAccessRecordReqDTO.getGid());
+        groupOwnershipService.assertOwnedByCurrentUser(linkStatsAccessRecordReqDTO.getGid());
         LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
                 .eq(LinkAccessLogsDO::getFullShortUrl, linkStatsAccessRecordReqDTO.getFullShortUrl())
                 .between(LinkAccessLogsDO::getCreateTime, linkStatsAccessRecordReqDTO.getStartDate(), linkStatsAccessRecordReqDTO.getEndDate())
@@ -276,7 +278,7 @@ public class LinkStatsServiceImpl implements LinkStatsService {
 
     @Override
     public LinkStatsRespDTO groupShortLinkStats(GroupStatsReqDTO groupStatsReqDTO) {
-        checkGroupBelongToUser(groupStatsReqDTO.getGid());
+        groupOwnershipService.assertOwnedByCurrentUser(groupStatsReqDTO.getGid());
         List<LinkAccessStatsDO> listStatsByGroup = linkAccessStatsMapper.listStatsByGroup(groupStatsReqDTO);
         if (CollUtil.isEmpty(listStatsByGroup)) {
             return null;
@@ -440,7 +442,7 @@ public class LinkStatsServiceImpl implements LinkStatsService {
 
     @Override
     public IPage<LinkStatsAccessRecordRespDTO> groupShortLinkStatsAccessRecord(GroupStatsAccessRecordReqDTO groupStatsAccessRecordReqDTO) {
-        checkGroupBelongToUser(groupStatsAccessRecordReqDTO.getGid());
+        groupOwnershipService.assertOwnedByCurrentUser(groupStatsAccessRecordReqDTO.getGid());
         IPage<LinkAccessLogsDO> linkAccessLogsDOIPage = linkAccessLogsMapper.selectGroupPage(groupStatsAccessRecordReqDTO);
         if (CollUtil.isEmpty(linkAccessLogsDOIPage.getRecords())) {
             return new Page<>();
@@ -466,17 +468,5 @@ public class LinkStatsServiceImpl implements LinkStatsService {
             each.setUvType(uvType);
         });
         return actualResult;
-    }
-
-    public void checkGroupBelongToUser(String gid) throws ServiceException {
-        String username = Optional.ofNullable(UserContext.getUsername())
-                .orElseThrow(() -> new ServiceException("用户未登录"));
-        LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
-                .eq(GroupDO::getGid, gid)
-                .eq(GroupDO::getUsername, username);
-        List<GroupDO> groupDOList = groupMapper.selectList(queryWrapper);
-        if (CollUtil.isEmpty(groupDOList)) {
-            throw new ServiceException("用户信息与分组标识不匹配");
-        }
     }
 }

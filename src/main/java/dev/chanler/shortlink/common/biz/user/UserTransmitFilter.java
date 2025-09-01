@@ -52,6 +52,8 @@ public class UserTransmitFilter implements Filter {
                     }
                     // 仅会话续期，不对 gid 索引续期
                     stringRedisTemplate.expire(key, SESSION_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
+                    // 仅刷新该用户 GID 正向索引集合 TTL（不回库、不补全）
+                    expireUserGidsTTL(username);
                 } catch (Exception e) {
                     throw new ClientException(USER_TOKEN_FAIL);
                 }
@@ -69,4 +71,11 @@ public class UserTransmitFilter implements Filter {
 
     private static final String SESSION_KEY_PREFIX = "short-link:session:";
     private static final long SESSION_TTL_MINUTES = 30L;
+
+    private static final String USER_GIDS_KEY = "short-link:user-gids:%s";
+
+    private void expireUserGidsTTL(String username) {
+        String setKey = String.format(USER_GIDS_KEY, username);
+        try { stringRedisTemplate.expire(setKey, SESSION_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES); } catch (Exception ignore) {}
+    }
 }

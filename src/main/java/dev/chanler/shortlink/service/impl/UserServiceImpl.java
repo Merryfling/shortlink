@@ -27,6 +27,8 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +38,8 @@ import java.util.concurrent.TimeUnit;
 
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.LOCK_USER_REGISTER_KEY;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_LOGIN_KEY;
-import static dev.chanler.shortlink.common.constant.RedisKeyConstant.GID_OWNER_KEY;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.SESSION_KEY_PREFIX;
+import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY;
 import static dev.chanler.shortlink.common.enums.UserErrorCodeEnum.*;
 
 /**
@@ -123,8 +125,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                     .orElseThrow(() -> new ClientException("用户登录错误"));
             stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + token, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
             stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
-            // 刷新该用户所有 gid 的反向索引 TTL
-            refreshGidReverseIndexTTL(userLoginReqDTO.getUsername());
+            // 刷新该用户 GID 正向索引集合 TTL（并补齐集合）
+            refreshUserGidsIndex(userLoginReqDTO.getUsername());
             return new UserLoginRespDTO(token);
         }
         // 生成新 token，并同时写入会话映射与兼容的用户名 Hash
@@ -132,8 +134,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + uuid, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
         stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
         stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
-        // 刷新该用户所有 gid 的反向索引 TTL
-        refreshGidReverseIndexTTL(userLoginReqDTO.getUsername());
+        // 刷新该用户 GID 正向索引集合 TTL（并补齐集合）
+        refreshUserGidsIndex(userLoginReqDTO.getUsername());
         return new UserLoginRespDTO(uuid);
     }
 
@@ -156,13 +158,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     /**
      * 刷新用户所有 gid 的反向索引 TTL（并纠偏 value）
      */
-    private void refreshGidReverseIndexTTL(String username) {
+    private void refreshUserGidsIndex(String username) {
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getUsername, username)
                 .eq(GroupDO::getDelFlag, 0);
-        groupMapper.selectList(queryWrapper).forEach(groupDO -> {
-            String key = String.format(GID_OWNER_KEY, groupDO.getGid());
-            stringRedisTemplate.opsForValue().set(key, username, 30L, TimeUnit.MINUTES);
+        var groups = groupMapper.selectList(queryWrapper);
+        if (groups == null || groups.isEmpty()) {
+            // 仍需设置空集合的 TTL，避免不存在导致后续频繁回库
+            String setKey = String.format(USER_GIDS_KEY, username);
+            stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
+            return;
+        }
+        String setKey = String.format(USER_GIDS_KEY, username);
+        stringRedisTemplate.executePipelined((SessionCallback<Object>) (RedisOperations operations) -> {
+            groups.forEach(groupDO -> operations.opsForSet().add(setKey, groupDO.getGid()));
+            return null;
         });
+        stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
     }
 }
