@@ -31,9 +31,14 @@ public class TokenDO extends BaseDO {
     private String username;
 
     /**
-     *  token（仅创建时可见，可考虑存储哈希）
+     * token 哈希（SHA-256 十六进制）
      */
-    private String token;
+    private String tokenHash;
+
+    /**
+     * token 后四位（用于识别显示）
+     */
+    private String tokenLast4;
 
     /**
      * 令牌名称
@@ -56,4 +61,3 @@ public class TokenDO extends BaseDO {
     @TableField("`describe`")
     private String describe;
 }
-

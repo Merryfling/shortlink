@@ -12,6 +12,7 @@ import dev.chanler.shortlink.dto.req.TokenCreateReqDTO;
 import dev.chanler.shortlink.dto.resp.TokenRespDTO;
 import dev.chanler.shortlink.service.TokenService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,8 +21,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import static dev.chanler.shortlink.common.constant.RedisKeyConstant.API_TOKEN_KEY_PREFIX;
+import static dev.chanler.shortlink.common.constant.RedisKeyConstant.API_TOKEN_HASH_KEY_PREFIX;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenServiceImpl extends ServiceImpl<TokenMapper, TokenDO> implements TokenService {
@@ -32,16 +34,19 @@ public class TokenServiceImpl extends ServiceImpl<TokenMapper, TokenDO> implemen
     public String createToken(TokenCreateReqDTO req) {
         String username = Objects.requireNonNull(UserContext.getUsername(), "用户未登录");
         String token = java.util.UUID.randomUUID().toString().replace("-", "");
+        String tokenHash = sha256Hex(token);
+        String last4 = token.substring(Math.max(0, token.length() - 4));
         TokenDO entity = TokenDO.builder()
                 .username(username)
-                .token(token)
+                .tokenHash(tokenHash)
+                .tokenLast4(last4)
                 .name(StrUtil.blankToDefault(req.getName(), "默认令牌"))
                 .enableStatus(0)
                 .validDate(req.getValidDate())
                 .describe(req.getDescribe())
                 .build();
         baseMapper.insert(entity);
-        writeRedisMapping(token, username, req.getValidDate());
+        writeRedisMapping(tokenHash, username, req.getValidDate());
         return token;
     }
 
@@ -58,7 +63,7 @@ public class TokenServiceImpl extends ServiceImpl<TokenMapper, TokenDO> implemen
                 .enableStatus(each.getEnableStatus())
                 .validDate(each.getValidDate())
                 .describe(each.getDescribe())
-                .tokenMasked(mask(each.getToken()))
+                .tokenMasked(mask(each.getTokenLast4()))
                 .build()).toList();
     }
 
@@ -69,8 +74,10 @@ public class TokenServiceImpl extends ServiceImpl<TokenMapper, TokenDO> implemen
         if (token == null || !Objects.equals(token.getUsername(), username) || token.getDelFlag() != 0) {
             throw new ClientException("令牌不存在");
         }
-        // 删除 Redis 映射
-        try { stringRedisTemplate.delete(String.format(API_TOKEN_KEY_PREFIX, token.getToken())); } catch (Exception ignore) {}
+        // 删除 Redis 映射（按哈希键）
+        try { stringRedisTemplate.delete(String.format(API_TOKEN_HASH_KEY_PREFIX, token.getTokenHash())); } catch (Throwable t) {
+            log.error("Delete api-token mapping error", t);
+        }
         // 逻辑删除
         token.setDelFlag(1);
         baseMapper.updateById(token);
@@ -90,29 +97,46 @@ public class TokenServiceImpl extends ServiceImpl<TokenMapper, TokenDO> implemen
             }
             token.setEnableStatus(0);
             baseMapper.updateById(token);
-            writeRedisMapping(token.getToken(), username, token.getValidDate());
+            writeRedisMapping(token.getTokenHash(), username, token.getValidDate());
         } else {
             token.setEnableStatus(1);
             baseMapper.updateById(token);
-            try { stringRedisTemplate.delete(String.format(API_TOKEN_KEY_PREFIX, token.getToken())); } catch (Exception ignore) {}
+            try { stringRedisTemplate.delete(String.format(API_TOKEN_HASH_KEY_PREFIX, token.getTokenHash())); } catch (Throwable t) {
+                log.error("Delete api-token mapping error", t);
+            }
         }
     }
 
-    private void writeRedisMapping(String token, String username, java.util.Date validDate) {
-        String key = String.format(API_TOKEN_KEY_PREFIX, token);
-        if (validDate == null) {
-            stringRedisTemplate.opsForValue().set(key, username);
-        } else {
-            long ttl = validDate.getTime() - System.currentTimeMillis();
-            if (ttl <= 0) throw new ClientException("令牌过期时间无效");
-            stringRedisTemplate.opsForValue().set(key, username, ttl, TimeUnit.MILLISECONDS);
+    private void writeRedisMapping(String tokenHash, String username, java.util.Date validDate) {
+        String key = String.format(API_TOKEN_HASH_KEY_PREFIX, tokenHash);
+        try {
+            if (validDate == null) {
+                stringRedisTemplate.opsForValue().set(key, username);
+            } else {
+                long ttl = validDate.getTime() - System.currentTimeMillis();
+                if (ttl <= 0) throw new ClientException("令牌过期时间无效");
+                stringRedisTemplate.opsForValue().set(key, username, ttl, TimeUnit.MILLISECONDS);
+            }
+        } catch (Throwable t) {
+            log.error("Write api-token mapping error", t);
+            throw new ClientException("令牌写入失败");
         }
     }
 
-    private String mask(String token) {
-        if (StrUtil.isBlank(token)) return "";
-        int n = token.length();
-        String tail = token.substring(Math.max(0, n - 4));
-        return "****" + tail;
+    private String mask(String last4) {
+        if (StrUtil.isBlank(last4)) return "";
+        return "****" + last4;
+    }
+
+    private String sha256Hex(String s) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] bytes = md.digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            throw new ClientException("生成令牌失败");
+        }
     }
 }
