@@ -92,7 +92,7 @@ public class RedisKeyConstant {
      * Admin / Client 会话 Token 映射
      * 格式：short-link:session:{token} -> username
      */
-    public static final String SESSION_KEY_PREFIX = "short-link:session:";
+    public static final String SESSION_KEY_PREFIX = "short-link:session:%s";
 
     /**
      * Core API 访问令牌映射

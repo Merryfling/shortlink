@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Optional;
 
+import static dev.chanler.shortlink.common.constant.UserConstant.PUBLIC_USERNAME;
 import static dev.chanler.shortlink.common.convention.errorcode.BaseErrorCode.FLOW_LIMIT_ERROR;
 
 /**
@@ -40,27 +41,30 @@ public class UserFlowRiskControlFilter implements Filter {
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
         redisScript.setScriptSource(new ResourceScriptSource(new ClassPathResource(USER_FLOW_RISK_CONTROL_LUA_SCRIPT_PATH)));
         redisScript.setResultType(Long.class);
-        String username = Optional.ofNullable(UserContext.getUsername()).orElse("other");
+        String username = Optional.ofNullable(UserContext.getUsername()).orElse(PUBLIC_USERNAME);
         Long result;
         try {
             result = stringRedisTemplate.execute(redisScript, Lists.newArrayList(username), userFlowRiskControlConfiguration.getTimeWindow());
         } catch (Throwable ex) {
             log.error("执行用户请求流量限制LUA脚本出错", ex);
-            returnJson((HttpServletResponse) response, JSON.toJSONString(Results.failure(new ClientException(FLOW_LIMIT_ERROR))));
+            tooMany((HttpServletResponse) response);
             return;
         }
         if (result == null || result > userFlowRiskControlConfiguration.getMaxAccessCount()) {
-            returnJson((HttpServletResponse) response, JSON.toJSONString(Results.failure(new ClientException(FLOW_LIMIT_ERROR))));
+            tooMany((HttpServletResponse) response);
             return;
         }
         filterChain.doFilter(request, response);
     }
 
-    private void returnJson(HttpServletResponse response, String json) throws Exception {
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType("text/html; charset=utf-8");
-        try (PrintWriter writer = response.getWriter()) {
-            writer.print(json);
+    private void tooMany(HttpServletResponse resp) throws IOException {
+        // 用户级限流：返回 429，携带 JSON 错误体
+        resp.setStatus(429);
+        resp.setCharacterEncoding("UTF-8");
+        resp.setContentType("application/json;charset=UTF-8");
+        String body = JSON.toJSONString(Results.failure(new ClientException(FLOW_LIMIT_ERROR)));
+        try (PrintWriter writer = resp.getWriter()) {
+            writer.print(body);
         }
     }
 }
