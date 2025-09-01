@@ -108,6 +108,32 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
             groupOwnershipService.assertOwnedByCurrentUser(linkCreateReqDTO.getGid());
         }
         verificationWhitelist(linkCreateReqDTO.getOriginUrl());
+        
+        // 设置默认值
+        if (linkCreateReqDTO.getCreatedType() == null) {
+            linkCreateReqDTO.setCreatedType(0);
+        }
+        if (linkCreateReqDTO.getValidDateType() == null) {
+            linkCreateReqDTO.setValidDateType(ValidDateTypeEnum.CUSTOM.getType());
+        }
+        
+        // 处理有效期逻辑，限制最大3天
+        Date now = new Date();
+        Date maxValidDate = DateUtil.offsetDay(now, 3);
+        
+        if (linkCreateReqDTO.getValidDate() == null) {
+            // 如果没有传入validDate，默认设置为1天后
+            linkCreateReqDTO.setValidDate(DateUtil.offsetDay(now, 1));
+        } else if (linkCreateReqDTO.getValidDate().after(maxValidDate)) {
+            // 如果传入的validDate超过3天，修正为3天
+            linkCreateReqDTO.setValidDate(maxValidDate);
+        }
+        
+        // 确保不是永久有效
+        if (linkCreateReqDTO.getValidDateType() == ValidDateTypeEnum.PERMANENT.getType()) {
+            linkCreateReqDTO.setValidDateType(ValidDateTypeEnum.CUSTOM.getType());
+        }
+        
         String shortLinkSuffix = generateSuffix(linkCreateReqDTO);
         String fullShortUrl = StrBuilder.create(createLinkDefaultDomain)
                 .append("/")
