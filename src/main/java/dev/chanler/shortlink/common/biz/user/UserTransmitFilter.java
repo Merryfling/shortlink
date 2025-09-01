@@ -7,6 +7,7 @@ import dev.chanler.shortlink.common.convention.exception.ClientException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import static dev.chanler.shortlink.common.convention.errorcode.BaseErrorCode.US
  * @author: Chanler
  */
 @RequiredArgsConstructor
+@Slf4j
 public class UserTransmitFilter implements Filter {
 
     private final StringRedisTemplate stringRedisTemplate;
@@ -54,11 +56,12 @@ public class UserTransmitFilter implements Filter {
                     stringRedisTemplate.expire(key, SESSION_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
                     // 仅刷新该用户 GID 正向索引集合 TTL（不回库、不补全）
                     expireUserGidsTTL(username);
-                } catch (Exception e) {
+                } catch (Throwable t) {
+                    log.error("Admin session validate error", t);
                     throw new ClientException(USER_TOKEN_FAIL);
                 }
                 // 仅设置 username 即可
-                UserContext.setUser(UserInfoDTO.builder().username(username).build());
+                UserContext.setUsername(username);
             }
         }
 
@@ -76,6 +79,10 @@ public class UserTransmitFilter implements Filter {
 
     private void expireUserGidsTTL(String username) {
         String setKey = String.format(USER_GIDS_KEY, username);
-        try { stringRedisTemplate.expire(setKey, SESSION_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES); } catch (Exception ignore) {}
+        try {
+            stringRedisTemplate.expire(setKey, SESSION_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
+        } catch (Throwable t) {
+            log.error("Expire user_gids TTL error, username={}", username, t);
+        }
     }
 }
