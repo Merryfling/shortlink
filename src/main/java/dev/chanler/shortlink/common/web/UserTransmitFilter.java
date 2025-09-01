@@ -1,8 +1,9 @@
-package dev.chanler.shortlink.common.biz.user;
+package dev.chanler.shortlink.common.web;
 
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson2.JSON;
 import com.google.common.collect.Lists;
+import dev.chanler.shortlink.common.biz.user.UserContext;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
 import dev.chanler.shortlink.common.convention.result.Results;
 import jakarta.servlet.*;
@@ -15,6 +16,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.SESSION_KEY_PREFIX;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY;
@@ -67,7 +69,7 @@ public class UserTransmitFilter implements Filter {
                             return;
                         }
                         // 仅会话续期，不对 gid 索引续期
-                        stringRedisTemplate.expire(key, 30L, java.util.concurrent.TimeUnit.MINUTES);
+                        stringRedisTemplate.expire(key, 30L, TimeUnit.MINUTES);
                         // 仅刷新该用户 GID 正向索引集合 TTL（不回库、不补全）
                         expireUserGidsTTL(username);
                     } catch (Throwable t) {

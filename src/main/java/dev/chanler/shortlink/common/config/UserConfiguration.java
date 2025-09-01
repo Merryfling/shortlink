@@ -1,8 +1,8 @@
 package dev.chanler.shortlink.common.config;
 
-import dev.chanler.shortlink.common.biz.user.ApiTokenAuthFilter;
-import dev.chanler.shortlink.common.biz.user.UserFlowRiskControlFilter;
-import dev.chanler.shortlink.common.biz.user.UserTransmitFilter;
+import dev.chanler.shortlink.common.web.ApiTokenAuthFilter;
+import dev.chanler.shortlink.common.web.UserFlowRiskControlFilter;
+import dev.chanler.shortlink.common.web.UserTransmitFilter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;

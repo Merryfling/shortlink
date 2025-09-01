@@ -1,7 +1,8 @@
-package dev.chanler.shortlink.common.biz.user;
+package dev.chanler.shortlink.common.web;
 
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson2.JSON;
+import dev.chanler.shortlink.common.biz.user.UserContext;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
 import dev.chanler.shortlink.common.convention.result.Results;
 import jakarta.servlet.Filter;
@@ -16,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 
 import static dev.chanler.shortlink.common.convention.errorcode.BaseErrorCode.USER_TOKEN_FAIL;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.API_TOKEN_HASH_KEY_PREFIX;

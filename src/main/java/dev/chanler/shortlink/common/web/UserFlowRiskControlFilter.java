@@ -1,7 +1,8 @@
-package dev.chanler.shortlink.common.biz.user;
+package dev.chanler.shortlink.common.web;
 
 import com.alibaba.fastjson2.JSON;
 import com.google.common.collect.Lists;
+import dev.chanler.shortlink.common.biz.user.UserContext;
 import dev.chanler.shortlink.common.config.UserFlowRiskControlConfiguration;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
 import dev.chanler.shortlink.common.convention.result.Results;
