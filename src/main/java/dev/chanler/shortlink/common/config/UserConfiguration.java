@@ -1,5 +1,6 @@
 package dev.chanler.shortlink.common.config;
 
+import dev.chanler.shortlink.common.biz.user.ApiTokenAuthFilter;
 import dev.chanler.shortlink.common.biz.user.UserFlowRiskControlFilter;
 import dev.chanler.shortlink.common.biz.user.UserTransmitFilter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,6 +26,18 @@ public class UserConfiguration {
         // 仅拦截管理端路由，避免误伤核心与跳转
         registration.addUrlPatterns("/api/short-link/admin/*");
         registration.setOrder(0);
+        return registration;
+    }
+
+    /**
+     * Core API Token 过滤器
+     */
+    @Bean
+    public FilterRegistrationBean<ApiTokenAuthFilter> coreApiTokenAuthFilter(StringRedisTemplate stringRedisTemplate) {
+        FilterRegistrationBean<ApiTokenAuthFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(new ApiTokenAuthFilter(stringRedisTemplate));
+        registration.addUrlPatterns("/api/short-link/v1/*");
+        registration.setOrder(1);
         return registration;
     }
 

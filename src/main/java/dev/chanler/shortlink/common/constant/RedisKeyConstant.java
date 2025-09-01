@@ -75,4 +75,22 @@ public class RedisKeyConstant {
      * 短链接监控消息保存队列 Group 缓存标识
      */
     public static final String SHORT_LINK_STATS_STREAM_GROUP_KEY = "short-link:stats-stream:only-group";
+
+    /**
+     * GID 反向归属索引
+     * 格式：short-link:gid-owner:{gid} -> username
+     */
+    public static final String GID_OWNER_KEY = "short-link:gid-owner:%s";
+
+    /**
+     * Admin / Client 会话 Token 映射
+     * 格式：short-link:session:{token} -> username
+     */
+    public static final String SESSION_KEY_PREFIX = "short-link:session:";
+
+    /**
+     * Core API 访问令牌映射
+     * 格式：short-link:api-token:{token} -> username
+     */
+    public static final String API_TOKEN_KEY_PREFIX = "short-link:api-token:%s";
 }

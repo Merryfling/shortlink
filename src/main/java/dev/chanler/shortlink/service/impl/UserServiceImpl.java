@@ -11,7 +11,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
 import dev.chanler.shortlink.common.enums.UserErrorCodeEnum;
 import dev.chanler.shortlink.dao.entity.UserDO;
+import dev.chanler.shortlink.dao.entity.GroupDO;
 import dev.chanler.shortlink.dao.mapper.UserMapper;
+import dev.chanler.shortlink.dao.mapper.GroupMapper;
 import dev.chanler.shortlink.dto.req.UserLoginReqDTO;
 import dev.chanler.shortlink.dto.req.UserRegisterReqDTO;
 import dev.chanler.shortlink.dto.req.UserUpdateReqDTO;
@@ -34,6 +36,8 @@ import java.util.concurrent.TimeUnit;
 
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.LOCK_USER_REGISTER_KEY;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_LOGIN_KEY;
+import static dev.chanler.shortlink.common.constant.RedisKeyConstant.GID_OWNER_KEY;
+import static dev.chanler.shortlink.common.constant.RedisKeyConstant.SESSION_KEY_PREFIX;
 import static dev.chanler.shortlink.common.enums.UserErrorCodeEnum.*;
 
 /**
@@ -48,6 +52,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
     private final GroupService groupService;
+    private final GroupMapper groupMapper;
 
     @Override
     public UserRespDTO getByUsername(String username) {
@@ -118,6 +123,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                     .orElseThrow(() -> new ClientException("用户登录错误"));
             stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + token, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
             stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+            // 刷新该用户所有 gid 的反向索引 TTL
+            refreshGidReverseIndexTTL(userLoginReqDTO.getUsername());
             return new UserLoginRespDTO(token);
         }
         // 生成新 token，并同时写入会话映射与兼容的用户名 Hash
@@ -125,6 +132,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + uuid, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
         stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
         stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+        // 刷新该用户所有 gid 的反向索引 TTL
+        refreshGidReverseIndexTTL(userLoginReqDTO.getUsername());
         return new UserLoginRespDTO(uuid);
     }
 
@@ -144,5 +153,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         stringRedisTemplate.delete(key);
     }
 
-    private static final String SESSION_KEY_PREFIX = "short-link:session:";
+    /**
+     * 刷新用户所有 gid 的反向索引 TTL（并纠偏 value）
+     */
+    private void refreshGidReverseIndexTTL(String username) {
+        LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
+                .eq(GroupDO::getUsername, username)
+                .eq(GroupDO::getDelFlag, 0);
+        groupMapper.selectList(queryWrapper).forEach(groupDO -> {
+            String key = String.format(GID_OWNER_KEY, groupDO.getGid());
+            stringRedisTemplate.opsForValue().set(key, username, 30L, TimeUnit.MINUTES);
+        });
+    }
 }
