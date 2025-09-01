@@ -111,21 +111,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries(USER_LOGIN_KEY + userLoginReqDTO.getUsername());
         if (CollUtil.isNotEmpty(hasLoginMap)) {
-            stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+            // 续期旧 token 的会话映射
             String token = hasLoginMap.keySet().stream()
                     .findFirst()
                     .map(Object::toString)
                     .orElseThrow(() -> new ClientException("用户登录错误"));
+            stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + token, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+            stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
             return new UserLoginRespDTO(token);
         }
-        /**
-         * Hash
-         * Key：login_用户名
-         * Value：
-         *  Key：token标识
-         *  Val：JSON 字符串（用户信息）
-         */
+        // 生成新 token，并同时写入会话映射与兼容的用户名 Hash
         String uuid = UUID.randomUUID().toString();
+        stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + uuid, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
         stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
         stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
         return new UserLoginRespDTO(uuid);
@@ -133,15 +130,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public Boolean checkLogin(String username, String token) {
-        return stringRedisTemplate.opsForHash().get("login_" + username, token) != null;
+        String actualUsername = stringRedisTemplate.opsForValue().get(SESSION_KEY_PREFIX + token);
+        return actualUsername != null && actualUsername.equals(username);
     }
 
     @Override
     public void logout(String username, String token) {
-        if (checkLogin(username, token)) {
-            stringRedisTemplate.delete(username);
-            return;
+        String key = SESSION_KEY_PREFIX + token;
+        String actualUsername = stringRedisTemplate.opsForValue().get(key);
+        if (actualUsername == null || !actualUsername.equals(username)) {
+            throw new ClientException("用户未登录或登录已过期");
         }
-        throw new ClientException("用户未登录或登录已过期");
+        stringRedisTemplate.delete(key);
     }
+
+    private static final String SESSION_KEY_PREFIX = "short-link:session:";
 }

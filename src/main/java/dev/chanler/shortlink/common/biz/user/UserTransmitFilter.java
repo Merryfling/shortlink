@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
-import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_LOGIN_KEY;
 import static dev.chanler.shortlink.common.convention.errorcode.BaseErrorCode.USER_TOKEN_FAIL;
 
 /**
@@ -36,22 +35,28 @@ public class UserTransmitFilter implements Filter {
         if (!IGNORE_URI.contains(requestURI)) {
             String method = httpServletRequest.getMethod();
             if (!(Objects.equals(requestURI, "/api/short-link/admin/v1/user") && Objects.equals(method, "POST"))) {
-                String username = httpServletRequest.getHeader("username");
-                String token = httpServletRequest.getHeader("token");
-                if (!StrUtil.isAllNotBlank(username, token)) {
+                String authz = httpServletRequest.getHeader("Authorization");
+                if (StrUtil.isBlank(authz) || !StrUtil.startWithIgnoreCase(authz, "Bearer ")) {
                     throw new ClientException(USER_TOKEN_FAIL);
                 }
-                Object userInfoJsonStr;
+                String token = StrUtil.trim(authz.substring(7));
+                if (StrUtil.isBlank(token)) {
+                    throw new ClientException(USER_TOKEN_FAIL);
+                }
+                String username;
                 try {
-                    userInfoJsonStr = stringRedisTemplate.opsForHash().get(USER_LOGIN_KEY + username, token);
-                    if (userInfoJsonStr == null) {
+                    String key = SESSION_KEY_PREFIX + token;
+                    username = stringRedisTemplate.opsForValue().get(key);
+                    if (StrUtil.isBlank(username)) {
                         throw new ClientException(USER_TOKEN_FAIL);
                     }
+                    // 仅会话续期，不对 gid 索引续期
+                    stringRedisTemplate.expire(key, SESSION_TTL_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
                 } catch (Exception e) {
                     throw new ClientException(USER_TOKEN_FAIL);
                 }
-                UserInfoDTO userInfoDTO = JSON.parseObject(userInfoJsonStr.toString(), UserInfoDTO.class);
-                UserContext.setUser(userInfoDTO);
+                // 仅设置 username 即可
+                UserContext.setUser(UserInfoDTO.builder().username(username).build());
             }
         }
 
@@ -61,4 +66,7 @@ public class UserTransmitFilter implements Filter {
             UserContext.removeUser();
         }
     }
+
+    private static final String SESSION_KEY_PREFIX = "short-link:session:";
+    private static final long SESSION_TTL_MINUTES = 30L;
 }

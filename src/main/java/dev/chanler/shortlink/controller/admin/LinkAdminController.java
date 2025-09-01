@@ -59,7 +59,7 @@ public class LinkAdminController {
      * @return Result<IPage<LinkPageRespDTO>>
      */
     @GetMapping("/api/short-link/admin/v1/page")
-    public Result<IPage<LinkPageRespDTO>> pageLink(@RequestBody LinkPageReqDTO linkPageReqDTO) {
+    public Result<IPage<LinkPageRespDTO>> pageLink(LinkPageReqDTO linkPageReqDTO) {
         return Results.success(linkService.pageLink(linkPageReqDTO));
     }
 }
