@@ -35,7 +35,14 @@ public enum BaseErrorCode implements IErrorCode {
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),
 
     // ========== 一级宏观错误码 调用第三方服务出错 ==========
-    REMOTE_ERROR("C000001", "调用第三方服务出错");
+    REMOTE_ERROR("C000001", "调用第三方服务出错"),
+
+    // ========== 业务补充：用户相关 ==========
+    // 保持与历史 UserErrorCodeEnum 一致，便于平滑迁移
+    USER_NULL("B000200", "用户记录不存在"),
+    USER_NAME_EXIST("B00201", "用户名已存在"),
+    USER_EXIST("B00202", "用户记录已存在"),
+    USER_SAVE_ERROR("B00202", "用户记录失败");
 
     private final String code;
 
