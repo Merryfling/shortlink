@@ -42,7 +42,7 @@ public class RecycleBinAdminController {
      * @return Result<IPage<LinkPageRespDTO>>
      */
     @GetMapping("/api/short-link/admin/v1/recycle-bin/page")
-    public Result<IPage<LinkPageRespDTO>> pageLink(@RequestBody RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
+    public Result<IPage<LinkPageRespDTO>> pageLink(RecycleBinLinkPageReqDTO recycleBinLinkPageReqDTO) {
         return Results.success(recycleBinService.pageRecycleBinLink(recycleBinLinkPageReqDTO));
     }
 

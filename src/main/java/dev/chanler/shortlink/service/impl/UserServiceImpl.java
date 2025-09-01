@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import dev.chanler.shortlink.common.convention.exception.ClientException;
-import dev.chanler.shortlink.common.enums.UserErrorCodeEnum;
+import dev.chanler.shortlink.common.convention.errorcode.BaseErrorCode;
 import dev.chanler.shortlink.dao.entity.UserDO;
 import dev.chanler.shortlink.dao.entity.GroupDO;
 import dev.chanler.shortlink.dao.mapper.UserMapper;
@@ -22,6 +22,7 @@ import dev.chanler.shortlink.dto.resp.UserRespDTO;
 import dev.chanler.shortlink.service.GroupService;
 import dev.chanler.shortlink.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -29,10 +30,16 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -40,12 +47,13 @@ import static dev.chanler.shortlink.common.constant.RedisKeyConstant.LOCK_USER_R
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_LOGIN_KEY;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.SESSION_KEY_PREFIX;
 import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY;
-import static dev.chanler.shortlink.common.enums.UserErrorCodeEnum.*;
+import static dev.chanler.shortlink.common.convention.errorcode.BaseErrorCode.*;
 
 /**
  * 用户接口实现层
  * @author: Chanler
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
@@ -56,13 +64,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private final GroupService groupService;
     private final GroupMapper groupMapper;
 
+    private static final String USER_GIDS_REFRESH_LUA_SCRIPT_PATH = "lua/user_gids_refresh.lua";
+
     @Override
     public UserRespDTO getByUsername(String username) {
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
                 .eq(UserDO::getUsername, username);
         UserDO userDO = baseMapper.selectOne(queryWrapper);
         if (userDO == null) {
-            throw new ClientException(UserErrorCodeEnum.USER_NULL);
+            throw new ClientException(BaseErrorCode.USER_NULL);
         }
         UserRespDTO result = new UserRespDTO();
         BeanUtils.copyProperties(userDO, result);
@@ -162,18 +172,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.lambdaQuery(GroupDO.class)
                 .eq(GroupDO::getUsername, username)
                 .eq(GroupDO::getDelFlag, 0);
-        var groups = groupMapper.selectList(queryWrapper);
-        if (groups == null || groups.isEmpty()) {
-            // 仍需设置空集合的 TTL，避免不存在导致后续频繁回库
+        try {
+            List<GroupDO> groups = groupMapper.selectList(queryWrapper);
             String setKey = String.format(USER_GIDS_KEY, username);
-            stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
-            return;
+            if (groups == null || groups.isEmpty()) {
+                stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
+                return;
+            }
+            // 使用 Lua（资源文件）一次性重建集合并设置 TTL（原子性更好）
+            DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+            script.setResultType(Long.class);
+            script.setScriptSource(new ResourceScriptSource(new ClassPathResource(USER_GIDS_REFRESH_LUA_SCRIPT_PATH)));
+            List<String> keys = Collections.singletonList(setKey);
+            List<Object> args = new ArrayList<>();
+            args.add(30 * 60); // TTL 秒
+            for (GroupDO groupDO : groups) {
+                args.add(groupDO.getGid());
+            }
+            stringRedisTemplate.execute(script, keys, args.toArray());
+        } catch (Throwable t) {
+            // 可按需记录日志
+            log.error("Refresh user_gids index error, username={}", username, t);
         }
-        String setKey = String.format(USER_GIDS_KEY, username);
-        stringRedisTemplate.executePipelined((SessionCallback<Object>) (RedisOperations operations) -> {
-            groups.forEach(groupDO -> operations.opsForSet().add(setKey, groupDO.getGid()));
-            return null;
-        });
-        stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
     }
 }

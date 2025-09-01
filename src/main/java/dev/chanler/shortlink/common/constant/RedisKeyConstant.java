@@ -96,7 +96,13 @@ public class RedisKeyConstant {
 
     /**
      * Core API 访问令牌映射
-     * 格式：short-link:api-token:{token} -> username
+     * 明文映射（旧方案，逐步废弃）：short-link:api-token:{token} -> username
      */
     public static final String API_TOKEN_KEY_PREFIX = "short-link:api-token:%s";
+
+    /**
+     * Core API 访问令牌映射（哈希值）
+     * 格式：short-link:api-token-h:{sha256(token)} -> username
+     */
+    public static final String API_TOKEN_HASH_KEY_PREFIX = "short-link:api-token-h:%s";
 }

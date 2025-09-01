@@ -152,7 +152,8 @@ public class LinkServiceImpl extends ServiceImpl<LinkMapper, LinkDO> implements 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void updateLink(LinkUpdateReqDTO linkUpdateReqDTO) {
-        // 鉴权：校验新的分组归属
+        // 鉴权：旧、新分组均需属于当前用户
+        groupOwnershipService.assertOwnedByCurrentUser(linkUpdateReqDTO.getOriginGid());
         groupOwnershipService.assertOwnedByCurrentUser(linkUpdateReqDTO.getGid());
         verificationWhitelist(linkUpdateReqDTO.getOriginUrl());
         LambdaQueryWrapper<LinkDO> queryWrapper = Wrappers.lambdaQuery(LinkDO.class)

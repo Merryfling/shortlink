@@ -26,6 +26,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import static dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY;
 
 import java.util.List;
 import java.util.Objects;
@@ -79,10 +80,12 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             baseMapper.insert(groupDO);
             // 维护正向索引集合：user_gids
             try {
-                String key = String.format(dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY, username);
+                String key = String.format(USER_GIDS_KEY, username);
                 stringRedisTemplate.opsForSet().add(key, gid);
                 stringRedisTemplate.expire(key, 30L, java.util.concurrent.TimeUnit.MINUTES);
-            } catch (Exception ignore) {}
+            } catch (Throwable t) {
+                log.error("Maintain user_gids on create error, username={}, gid={}", username, gid, t);
+            }
         } finally {
             lock.unlock();
         }
@@ -121,9 +124,11 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         groupDO.setDelFlag(1);
         baseMapper.update(groupDO, updateWrapper);
         try {
-            String key = String.format(dev.chanler.shortlink.common.constant.RedisKeyConstant.USER_GIDS_KEY, UserContext.getUsername());
+            String key = String.format(USER_GIDS_KEY, UserContext.getUsername());
             stringRedisTemplate.opsForSet().remove(key, gid);
-        } catch (Exception ignore) {}
+        } catch (Throwable t) {
+            log.error("Maintain user_gids on delete error, username={}, gid={}", UserContext.getUsername(), gid, t);
+        }
     }
 
     @Override
