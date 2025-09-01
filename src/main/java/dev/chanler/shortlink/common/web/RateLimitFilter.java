@@ -65,12 +65,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 tooMany(req, resp);
                 return;
             }
+        } else if ("/api/short-link/admin/v1/create".equals(path)) {
+            if (!createRateLimiter.tryAcquire(1, props.getCreate().getTimeout(), TimeUnit.MILLISECONDS)) {
+                tooMany(req, resp);
+                return;
+            }
         } else if ("/api/short-link/v1/create/batch".equals(path)) {
             if (!createRateLimiter.tryAcquire(5, props.getCreate().getTimeout(), TimeUnit.MILLISECONDS)) {
                 tooMany(req, resp);
                 return;
             }
-        } else if (path.startsWith("/api/short-link/v1/stats")) {
+        } else if ("/api/short-link/admin/v1/create/batch".equals(path)) {
+            if (!createRateLimiter.tryAcquire(5, props.getCreate().getTimeout(), TimeUnit.MILLISECONDS)) {
+                tooMany(req, resp);
+                return;
+            }
+        } else if (path.startsWith("/api/short-link/admin/v1/stats")) {
             if (!statsRateLimiter.tryAcquire(1, props.getStats().getTimeout(), TimeUnit.MILLISECONDS)) {
                 tooMany(req, resp);
                 return;
