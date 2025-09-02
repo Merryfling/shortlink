@@ -133,7 +133,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                     .findFirst()
                     .map(Object::toString)
                     .orElseThrow(() -> new ClientException("用户登录错误"));
-            stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + token, userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(String.format(SESSION_KEY_PREFIX, token), userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
             stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
             // 刷新该用户 GID 正向索引集合 TTL（并补齐集合）
             refreshUserGidsIndex(userLoginReqDTO.getUsername());
@@ -141,7 +141,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         // 生成新 token，并同时写入会话映射与兼容的用户名 Hash
         String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + uuid, userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(String.format(SESSION_KEY_PREFIX, uuid), userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
         stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
         stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
         // 刷新该用户 GID 正向索引集合 TTL（并补齐集合）
@@ -151,13 +151,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public Boolean checkLogin(String username, String token) {
-        String actualUsername = stringRedisTemplate.opsForValue().get(SESSION_KEY_PREFIX + token);
+        String actualUsername = stringRedisTemplate.opsForValue().get(String.format(SESSION_KEY_PREFIX, token));
         return actualUsername != null && actualUsername.equals(username);
     }
 
     @Override
     public void logout(String username, String token) {
-        String key = SESSION_KEY_PREFIX + token;
+        String key = String.format(SESSION_KEY_PREFIX, token);
         String actualUsername = stringRedisTemplate.opsForValue().get(key);
         if (actualUsername == null || !actualUsername.equals(username)) {
             throw new ClientException("用户未登录或登录已过期");
