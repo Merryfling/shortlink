@@ -51,7 +51,7 @@ public class GroupOwnershipVerifierImpl implements GroupOwnershipVerifier {
         }
         try {
             stringRedisTemplate.opsForSet().add(setKey, gid);
-            stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
+            stringRedisTemplate.expire(setKey, 30, TimeUnit.MINUTES);
         } catch (Throwable t) {
             log.error("Redis SADD/EXPIRE user-gids error, username={}, gid= {}", username, gid, t);
         }

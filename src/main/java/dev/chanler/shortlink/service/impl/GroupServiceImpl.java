@@ -82,7 +82,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             try {
                 String key = String.format(USER_GIDS_KEY, username);
                 stringRedisTemplate.opsForSet().add(key, gid);
-                stringRedisTemplate.expire(key, 30L, java.util.concurrent.TimeUnit.MINUTES);
+                stringRedisTemplate.expire(key, 30, java.util.concurrent.TimeUnit.MINUTES);
             } catch (Throwable t) {
                 log.error("Maintain user_gids on create error, username={}, gid={}", username, gid, t);
             }

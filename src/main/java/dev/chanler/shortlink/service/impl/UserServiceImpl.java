@@ -133,17 +133,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                     .findFirst()
                     .map(Object::toString)
                     .orElseThrow(() -> new ClientException("用户登录错误"));
-            stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + token, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
-            stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + token, userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
+            stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
             // 刷新该用户 GID 正向索引集合 TTL（并补齐集合）
             refreshUserGidsIndex(userLoginReqDTO.getUsername());
             return new UserLoginRespDTO(token);
         }
         // 生成新 token，并同时写入会话映射与兼容的用户名 Hash
         String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + uuid, userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(SESSION_KEY_PREFIX + uuid, userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
         stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), uuid, JSON.toJSONString(userDO));
-        stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30L, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(USER_LOGIN_KEY + userLoginReqDTO.getUsername(), 30, TimeUnit.MINUTES);
         // 刷新该用户 GID 正向索引集合 TTL（并补齐集合）
         refreshUserGidsIndex(userLoginReqDTO.getUsername());
         return new UserLoginRespDTO(uuid);
@@ -176,7 +176,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             List<GroupDO> groups = groupMapper.selectList(queryWrapper);
             String setKey = String.format(USER_GIDS_KEY, username);
             if (groups == null || groups.isEmpty()) {
-                stringRedisTemplate.expire(setKey, 30L, TimeUnit.MINUTES);
+                stringRedisTemplate.expire(setKey, 30, TimeUnit.MINUTES);
                 return;
             }
             // 使用 Lua（资源文件）一次性重建集合并设置 TTL（原子性更好）
@@ -185,7 +185,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             script.setScriptSource(new ResourceScriptSource(new ClassPathResource(USER_GIDS_REFRESH_LUA_SCRIPT_PATH)));
             List<String> keys = Collections.singletonList(setKey);
             List<Object> args = new ArrayList<>();
-            args.add(30 * 60); // TTL 秒
+            args.add(String.valueOf(30 * 60)); // TTL 秒，转为字符串
             for (GroupDO groupDO : groups) {
                 args.add(groupDO.getGid());
             }

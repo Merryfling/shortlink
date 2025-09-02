@@ -26,7 +26,7 @@ public class MessageQueueIdempotentHandler {
      */
     public boolean isMessageBeingConsumed(String messageId) {
         String key = String.format(IDEMPOTENT_KEY_PREFIX, messageId);
-        return Boolean.FALSE.equals(stringRedisTemplate.opsForValue().setIfAbsent(key, "0", 2, TimeUnit.MINUTES));
+        return Boolean.FALSE.equals(stringRedisTemplate.opsForValue().setIfAbsent(key, "0", 2L, TimeUnit.MINUTES));
     }
 
     /**
@@ -45,7 +45,7 @@ public class MessageQueueIdempotentHandler {
      */
     public void setAccomplish(String messageId) {
         String key = String.format(IDEMPOTENT_KEY_PREFIX, messageId);
-        stringRedisTemplate.opsForValue().set(key, "1", 2, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(key, "1", 2L, TimeUnit.MINUTES);
     }
 
     /**
