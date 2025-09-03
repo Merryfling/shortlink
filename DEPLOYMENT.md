@@ -22,9 +22,10 @@
 # 下载部署文件
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/docker-compose.yml
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/link.sql
+wget https://raw.githubusercontent.com/Merryfling/shortlink/main/application.yaml
+wget https://raw.githubusercontent.com/Merryfling/shortlink/main/shardingsphere-config.yaml
 
 # 启动服务（使用默认密码）
-mkdir logs
 docker-compose up -d
 ```
 
@@ -34,6 +35,8 @@ docker-compose up -d
 # 1. 下载部署文件
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/docker-compose.yml
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/link.sql
+wget https://raw.githubusercontent.com/Merryfling/shortlink/main/application.yaml
+wget https://raw.githubusercontent.com/Merryfling/shortlink/main/shardingsphere-config.yaml
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/.env.example
 
 # 2. 设置自定义密码
@@ -46,7 +49,6 @@ vi .env
 # REDIS_PASSWORD=YourStrongPassword
 
 # 3. 启动服务
-mkdir logs
 docker-compose up -d
 ```
 
@@ -56,17 +58,15 @@ docker-compose up -d
 # 1. 下载所有文件
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/docker-compose.yml
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/link.sql
+wget https://raw.githubusercontent.com/Merryfling/shortlink/main/application.yaml
+wget https://raw.githubusercontent.com/Merryfling/shortlink/main/shardingsphere-config.yaml
 wget https://raw.githubusercontent.com/Merryfling/shortlink/main/.env.example
 
 # 2. 设置环境变量
 cp .env.example .env
 vi .env
 
-# 3. 下载配置文件模板（可选，便于修改）
-wget https://raw.githubusercontent.com/Merryfling/shortlink/main/src/main/resources/application.yaml -O application.yaml
-wget https://raw.githubusercontent.com/Merryfling/shortlink/main/src/main/resources/shardingsphere-config.yaml -O shardingsphere-config.yaml
-
-# 4. 编辑配置文件（根据需要修改）
+# 3. 编辑配置文件（根据需要修改）
 vi application.yaml
 # 主要修改：
 # - short-link.domain.default: 改为您的域名
@@ -77,8 +77,7 @@ vi shardingsphere-config.yaml
 # - 数据库连接信息（如果需要）
 # - 分表数量配置
 
-# 5. 启动服务
-mkdir logs
+# 4. 启动服务
 docker-compose up -d
 ```
 
@@ -87,18 +86,20 @@ docker-compose up -d
 ### 最简部署
 ```
 deployment/
-├── docker-compose.yml    # 服务编排文件
-├── link.sql             # 数据库表结构
-└── logs/               # 日志目录（自动创建）
+├── docker-compose.yml         # 服务编排文件
+├── link.sql                  # 数据库表结构
+├── application.yaml          # 应用配置
+└── shardingsphere-config.yaml # 分库分表配置
 ```
 
 ### 安全部署（推荐）
 ```
 deployment/
-├── docker-compose.yml    # 服务编排文件
-├── link.sql             # 数据库表结构
-├── .env                 # 环境变量配置（密码等）
-└── logs/               # 日志目录
+├── docker-compose.yml         # 服务编排文件
+├── link.sql                  # 数据库表结构
+├── application.yaml          # 应用配置
+├── shardingsphere-config.yaml # 分库分表配置
+└── .env                      # 环境变量配置（密码等）
 ```
 
 ### 完全自定义部署
@@ -107,9 +108,8 @@ deployment/
 ├── docker-compose.yml         # 服务编排文件
 ├── link.sql                  # 数据库表结构
 ├── .env                      # 环境变量配置
-├── application.yaml          # 自定义应用配置（可选）
-├── shardingsphere-config.yaml # 自定义分库分表配置（可选）
-└── logs/                     # 日志目录
+├── application.yaml          # 自定义应用配置
+└── shardingsphere-config.yaml # 自定义分库分表配置
 ```
 
 ## 🗄️ 数据库自动初始化
