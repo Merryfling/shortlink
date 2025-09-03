@@ -36,3 +36,19 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Docker & Deployment ###
+logs/
+*.log
+.env
+
+### Local Development ###
+application-local.yaml
+shardingsphere-local.yaml
+
+### Temporary Files ###
+*.tmp
+*.temp
+
+.serena
+.idea
