@@ -8,20 +8,28 @@ echo "🚀 Starting ShortLink Application..."
 CONFIG_OPTIONS=""
 
 # 检查 application.yaml
-if [ -f "/app/application.yaml" ]; then
+if [ -f "/app/application.yaml" ] && [ ! -d "/app/application.yaml" ]; then
     echo "✅ Using external application.yaml"
     CONFIG_OPTIONS="${CONFIG_OPTIONS}file:/app/application.yaml"
 else
     echo "📋 Using default application.yaml"
+    # 如果挂载点是目录，删除并复制默认配置
+    if [ -d "/app/application.yaml" ]; then
+        rmdir /app/application.yaml 2>/dev/null || true
+    fi
     cp /app/application-default.yaml /app/application.yaml
     CONFIG_OPTIONS="${CONFIG_OPTIONS}file:/app/application.yaml"
 fi
 
-# 检查 shardingsphere-config.yaml
-if [ -f "/app/shardingsphere-config.yaml" ]; then
+# 检查 shardingsphere-config.yaml  
+if [ -f "/app/shardingsphere-config.yaml" ] && [ ! -d "/app/shardingsphere-config.yaml" ]; then
     echo "✅ Using external shardingsphere-config.yaml"
 else
     echo "📋 Using default shardingsphere-config.yaml"
+    # 如果挂载点是目录，删除并复制默认配置
+    if [ -d "/app/shardingsphere-config.yaml" ]; then
+        rmdir /app/shardingsphere-config.yaml 2>/dev/null || true
+    fi
     cp /app/shardingsphere-default.yaml /app/shardingsphere-config.yaml
 fi
 
